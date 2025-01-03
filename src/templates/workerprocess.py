@@ -52,7 +52,7 @@ class WorkerProcess(Process):
 
         self._blocker = Event()
 
-    def _init_threads(self):
+    def _init_threads(self): # 각 프로세스에 필요한 쓰레드를 초기화하는 역할
         """It initializes the threads of the process and adds the thread to the 'threads' list, which will be automatically started and stopped in the 'run' method.
 
         Raises
@@ -61,6 +61,10 @@ class WorkerProcess(Process):
             Have to implement the initialization of threads
         """
         raise NotImplementedError
+        # 기본 클래스에서는 아무것도 정의하지 않고 NotImplementedError를 발생
+        # 이는 자식 클래스에서 반드시 구현해야 함을 명시적으로 나타냄
+        # 오버라이드란 자식 클래스가 부모 클래스에서 이미 제공하는 메소드를 자신의 목적에 맞도록 재정의 하는 것
+        # 오버라이드가 필요한 이유: 프로세스별로 고유한 작업이 다르기 때문
 
     def run(self):
         """This method applies the initialization of the theards and starts all of them. The process ignores the keyboardInterruption signal and can terminate by applying the 'stop' method.

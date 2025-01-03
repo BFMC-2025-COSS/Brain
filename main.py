@@ -70,6 +70,7 @@ queueList = {
     "General": Queue(),
     "Config": Queue(),
 }
+# 각 프로세스 간 데이터를 주고받기 위한 큐를 정의
 
 logging = logging.getLogger()
 
@@ -126,7 +127,7 @@ if SerialHandler:
 
 # ===================================== START PROCESSES ==================================
 for process in allProcesses:
-    process.daemon = True
+    process.daemon = True # 프로세스가 메인 프로그램 종료와 함께 자동으로 종료되도록 설정
     process.start()
 
 # ===================================== STAYING ALIVE ====================================

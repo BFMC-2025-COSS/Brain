@@ -49,8 +49,8 @@ class processSerialHandler(WorkerProcess):
 
     # ===================================== INIT =========================================
     def __init__(self, queueList, logging, debugging=False, example=False):
-        devFile = "/dev/ttyACM0"
-        logFile = "historyFile.txt"
+        devFile = "/dev/ttyACM0" # NUCLEO와 통신할 시리얼 디바이스
+        logFile = "historyFile.txt" # 로그 파일 이름
 
         # comm init
         self.serialCom = serial.Serial(devFile, 115200, timeout=0.1)

@@ -56,6 +56,7 @@ class ThreadStartFrontend(ThreadWithStop):
 
         try:
             subprocess.run(f"cd {self.project_path} && npm start", shell=True, check=True)
+            # Angular 프론트엔드 실행
             self.logger.info("Angular server started successfully.")
         except subprocess.CalledProcessError as e:
             self.logger.warning(f"Failed to start the Angular development server: {e}")

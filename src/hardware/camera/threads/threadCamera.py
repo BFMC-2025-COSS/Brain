@@ -126,13 +126,16 @@ class threadCamera(ThreadWithStop):
 
         send = True
         while self._running:
+        # self._running은 부모 클래스인 ThreadWithStop에서 관리되며, 쓰레드 종료 시 False로 설정.
             try:
                 recordRecv = self.recordSubscriber.receive()
+                # 메시지가 있으면 recordRecv에 저장.
                 if recordRecv is not None: 
                     self.recording = bool(recordRecv)
-                    if recordRecv == False:
+                # recordRecv 값(True/False)을 통해 녹화 여부를 업데이트.
+                    if recordRecv == False: # false이면 비디오 파일 저장 중단
                         self.video_writer.release()
-                    else:
+                    else: # True이면 새 비디오 파일 생성
                         fourcc = cv2.VideoWriter_fourcc(
                             *"XVID"
                         )  # You can choose different codecs, e.g., 'MJPG', 'XVID', 'H264', etc.
@@ -149,7 +152,7 @@ class threadCamera(ThreadWithStop):
             if send:
                 mainRequest = self.camera.capture_array("main")
                 serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
-
+                # 데이터 캡처 각각의 데이터는 배열 형태로 저장.
                 if self.recording == True:
                     self.video_writer.write(mainRequest)
 
@@ -157,10 +160,12 @@ class threadCamera(ThreadWithStop):
 
                 _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
                 _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
-
+                # 이미지 전처리 저해상도 데이터를 YUV 형식에서 BGR 형식으로 변환
+                
                 mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
                 serialEncodedImageData = base64.b64encode(serialEncodedImg).decode("utf-8")
-
+                # Base64는 텍스트 기반으로, 데이터를 메시지 큐를 통해 쉽게 전송 가능
+                
                 self.mainCameraSender.send(mainEncodedImageData)
                 self.serialCameraSender.send(serialEncodedImageData)
 

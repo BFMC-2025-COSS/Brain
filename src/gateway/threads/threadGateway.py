@@ -90,7 +90,8 @@ class threadGateway(ThreadWithStop):
             self.printList()
 
     # =================================== SENDING ========================================
-
+    # Critical, Warning, General 큐에서 메시지를 가져와 구독자에게 전달.
+    # 구독자 정보들은(utils_messages_allMessages.py)에 있다
     def send(self, message):
         """This functin will send the message on all the pipes that are in the sending list of the message ID.
         Args:
@@ -101,10 +102,10 @@ class threadGateway(ThreadWithStop):
         Id = message["msgID"]
         Type = message["msgType"]
         Value = message["msgValue"]
-        if (Owner, Id) in self.messageApproved:
+        if (Owner, Id) in self.messageApproved: # 구독 여부 확인
             for element in self.sendingList[Owner][Id]:
                 # We send a dictionary that contain the type of the message and message
-                self.sendingList[Owner][Id][element].send(
+                self.sendingList[Owner][Id][element].send( # 메시지를 파이프(Pipe)로 전송
                     {"Type": Type, "value": Value, "id": Id, "Owner": Owner}
                 )
                 if self.debugging:
@@ -136,7 +137,8 @@ class threadGateway(ThreadWithStop):
             elif not self.queuesList["General"].empty():
                 message = self.queuesList["General"].get()
             if message is not None:
-                self.send(message)
+                self.send(message) 
+                #여기서의 self.send는 그저 self.send함수로 보내는거고 그함수 안에서 파이프 사용해서 진짜 send
             if not self.queuesList["Config"].empty():
                 message2 = self.queuesList["Config"].get()
                 if str.lower(message2["Subscribe/Unsubscribe"]) == "subscribe":

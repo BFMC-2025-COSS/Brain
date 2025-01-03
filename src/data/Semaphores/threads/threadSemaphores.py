@@ -49,13 +49,15 @@ class threadSemaphores(ThreadWithStop):
         self.udp_factory = udpListener(self.queueList, self.logger, self.debugging)
         self.reactor = reactor
         self.reactor.listenUDP(self.listenPort, self.udp_factory)
+        # self.listenPort에서 UDP 메시지를 수신하면, self.udp_factory(udpListener)가 처리.
 
     # ======================================= RUN ==========================================
     def run(self):
         """
         Run the thread.
         """
-        self.reactor.run(installSignalHandlers=False)
+        self.reactor.run(installSignalHandlers=False) #이벤트 루프가 활성화되어 UDP 메시지 수신을 대기.
+
 
     # ====================================== STOP ==========================================
     def stop(self):

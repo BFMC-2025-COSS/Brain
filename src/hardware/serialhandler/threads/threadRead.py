@@ -92,13 +92,13 @@ class threadRead(ThreadWithStop):
     # ====================================== RUN ==========================================
     def run(self):
         while self._running:
-            read_chr = self.serialCon.read()
+            read_chr = self.serialCon.read() # 시리얼 포트에서 1바이트씩 데이터를 읽습니다.
             try:
-                read_chr = read_chr.decode("ascii")
-                if read_chr == "@":
+                read_chr = read_chr.decode("ascii") # ASCII 형식으로 디코딩
+                if read_chr == "@": #@로 시작하면 새로운 응답의 시작으로 간주
                     self.isResponse = True
                     self.buff = ""
-                elif read_chr == "\r":
+                elif read_chr == "\r": #\r로 끝나는 경우 응답 완료로 간주하고 sendqueue 호출
                     self.isResponse = False
                     if len(self.buff) != 0:
                         self.sendqueue(self.buff)
@@ -120,6 +120,9 @@ class threadRead(ThreadWithStop):
         action, value = buff.split(":") # @action:value;;
         action = action[1:]
         value = value[:-2]
+        #데이터를 action과 value로 분리
+        #ex) @speed:123.45;; → action = "speed", value = "123.45"
+
         if self.debugger:
             self.logger.info(buff)
 

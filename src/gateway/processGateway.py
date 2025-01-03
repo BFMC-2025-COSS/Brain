@@ -52,6 +52,7 @@ class processGateway(WorkerProcess):
         """Apply the initializing methods and start the threads."""
 
         super(processGateway, self).run()
+        # 현재 클래스의 부모 클래스(즉, 상위 클래스)의 메서드를 호출하는 데 사용
 
     # ===================================== INIT TH ==========================================
     def _init_threads(self):
