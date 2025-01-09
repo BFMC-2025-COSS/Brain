@@ -165,12 +165,30 @@ class processDashboard(WorkerProcess):
             emit('response', {'error': 'File not found. Please save the table state first.'})
         except json.JSONDecodeError:
             emit('response', {'error': 'Failed to parse JSON data from the file.'})
+    def get_cpu_temperature(self):
+        thermal_path = "/sys/class/thermal/thermal_zone1/temp"
+        try:
+            with open(thermal_path, "r") as file:
+                temp_millidegree = int(file.read().strip())
+                return round(temp_millidegree / 1000.0)
+        except FileNotFoundError:
+            raise RuntimeError("CPU thermal sensor not found!")
+        except Exception as e:
+            raise RuntimeError(f"Failed to read CPU temperature: {e}")
+
 
     def sendContinuousHardwareData(self):# 하드웨어 상태 측정
         self.memoryUsage = psutil.virtual_memory().percent
         self.cpuCoreUsage = psutil.cpu_percent(interval=1, percpu=True)
-        self.cpuTemperature = round(psutil.sensors_temperatures()['cpu_thermal'][0].current)
+        #self.cpuTemperature = round(psutil.sensors_temperatures()['CPU-therm'][0].current)
+        self.cpuTemperature = self.get_cpu_temperature()
         threading.Timer(1, self.sendContinuousHardwareData).start()
+
+    # def sendContinuousHardwareData(self):# 하드웨어 상태 측정
+    #     self.memoryUsage = psutil.virtual_memory().percent
+    #     self.cpuCoreUsage = psutil.cpu_percent(interval=1, percpu=True)
+    #     self.cpuTemperature = round(psutil.sensors_temperatures()['cpu_thermal'][0].current)
+    #     threading.Timer(1, self.sendContinuousHardwareData).start()
 
     def sendContinuousMessages(self):# WebSocket으로 데이터 전송
         counter = 1   

@@ -10,3 +10,5 @@ python3-cryptography=38.0.4
 python3-opencv
 python3-serial
 xdg-utils
+
+
