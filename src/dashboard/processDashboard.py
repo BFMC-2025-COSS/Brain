@@ -151,12 +151,14 @@ class processDashboard(WorkerProcess):
         if self.debugging:
             self.logger.info("Received message: " + data)
         dataDict = json.loads(data)
-        with open('/home/pi/Brain/src/utils/table_state.json', 'w') as json_file: # change me(path) 
+        #with open('/app/Brain/src/utils/table_state.json', 'w') as json_file: # change me(path) 
+        with open('/app/Brain/src/utils/table_state.json', 'w') as json_file: # change me(path) 
             json.dump(dataDict, json_file, indent=4)  
 
     def handleLoadTableState(self, data):
-        file_path = '/home/pi/Brain/src/utils/table_state.json' # change me(path)
-        
+        #file_path = '/home/pi/Brain/src/utils/table_state.json' # change me(path)
+        file_path = '/app/Brain/src/utils/table_state.json' # change me(path)
+
         try:
             with open(file_path, 'r') as json_file:
                 dataDict = json.load(json_file) 

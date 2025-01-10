@@ -12,3 +12,23 @@ python3-serial
 xdg-utils
 
 
+
+pip3 install (requirement.txt)
+sudo apt install -y xdg-utils
+apt install unzip
+mkdir app
+cd app
+git clone https://github.com/BFMC-2025-COSS/Brain.git
+cd Brain
+git checkout 9-make-brain-work-with-cv2-not-picamera2
+
+
+cd src/dashboard/frontend/
+curl -fsSL https://fnm.vercel.app/install | bash
+export PATH="/root/.local/share/fnm/node-versions/v22.13.0/installation/bin:$PATH"
+
+fnm install --lts
+npm install -g @angular/cli@17
+npm install
+
+cd ../../..
