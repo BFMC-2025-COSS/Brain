@@ -14,13 +14,15 @@ class threadYOLO(ThreadWithStop):
         self.logging = logging
         self.debugging = debugging
         self.frame_count = 0
+        self.not_detected_count = 0
         self.threshold_area = 28000  # BBOX Size Threshold
         self.threshold_conf = 0.4   # Confidence Threshold
         self.imgsz = imgsz
         self.fps = fps
         self.model = self._load_model()
         self.camera = self._init_camera()
-        self.brakeSender = messageHandlerSender(self.queuesList, AEB)
+        self.AEBSender = messageHandlerSender(self.queuesList, AEB)
+        
 
     def _load_model(self):
         """YOLO Model Load"""
@@ -61,16 +63,31 @@ class threadYOLO(ThreadWithStop):
 
                 if cls ==0: # 0: BFMC_pedestrian
                     print(f"cls:{int(cls)}, Area: {area:.2f}")
-                    if area > self.threshold_area and conf > self.threshold_conf:
-                        detected = True
+                    detected = True
+                    # if area > self.threshold_area and conf > self.threshold_conf:
+                    #     detected = True
+                else:
+                    detected = False
             # Visualize BBOX Image
             cv2.imshow("Detected",annotated_frame)
             cv2.waitKey(1)        
 
-            if detected and cls ==0: #Condition of stopping Vehicle
+            if detected: #Condition of stopping Vehicle
                 self.frame_count += 1
-                if self.frame_count >= 1:
-                    self.brakeSender.send(1.0)
+                self.not_detected_count = 0
+                if self.frame_count >= 2:
+                    self.AEBSender.send(1.0)
                     print("AEB Start")
             else:
-                self.frame_count = 0
+                print("00")
+                if self.frame_count >=2: # Already AEB situation
+                    print("11")
+                    self.not_detected_count += 1
+                    if self.not_detected_count >= 3: #AEB Finish signal
+                        print("22")
+                        self.AEBSender.send(0.0)
+                        print("AEB Stop - Vehicle Moving")
+                        self.frame_count = 0
+            
+
+                    

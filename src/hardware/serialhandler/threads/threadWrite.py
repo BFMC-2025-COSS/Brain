@@ -84,6 +84,8 @@ class threadWrite(ThreadWithStop):
             self.s = 0.0
             self.example()
 
+        self.lastspeed = 0 # For Finishing AEB System
+
     def subscribe(self):
         """Subscribe function. In this function we make all the required subscribe to process gateway"""
 
@@ -165,8 +167,15 @@ class threadWrite(ThreadWithStop):
                         if aeb_signal is not None:# YOLO
                             if self.debugger:
                                 self.logger.info(f"AEB signal received: {aeb_signal}")
-                            command = {"action": "brake", "steerAngle": 250}
-                            self.sendToSerial(command)
+                            if aeb_signal == 0.0:
+                                if self.lastspeed > 0:
+                                    command = {"action": "speed", "speed": self.lastspeed}
+                                    self.sendToSerial(command)
+
+                            elif aeb_signal == 1.0:
+                                command = {"action": "brake", "steerAngle": 250}
+                                self.sendToSerial(command)
+                            
 
                         brakeRecv = self.brakeSubscriber.receive()# other brake
                         if brakeRecv is not None:
@@ -180,6 +189,7 @@ class threadWrite(ThreadWithStop):
                             if self.debugger:
                                 self.logger.info(speedRecv)
                             command = {"action": "speed", "speed": int(speedRecv)}
+                            self.lastspeed = int(speedRecv)
                             self.sendToSerial(command)
 
                         steerRecv = self.steerMotorSubscriber.receive()
