@@ -245,3 +245,8 @@ class WarningSignal(Enum):
     msgType = "str"
 
 ### It will have this format: {"WarningName":"name1", "WarningID": 1}
+class AEB(Enum):
+    Queue = "General"
+    Owner = "threadYOLO"
+    msgID = 1
+    msgType = "float"
