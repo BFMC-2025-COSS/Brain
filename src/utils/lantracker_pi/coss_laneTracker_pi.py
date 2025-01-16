@@ -18,7 +18,9 @@ while True:
     bird_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     lane_tracker = LaneTracker(bird_img)
-    processed_frame = lane_tracker.process(bird_img)
+    processed_frame, offset, cur = lane_tracker.process(bird_img)
+    print(offset,cur)
+
 
     cv2.imshow("Lane Tracking", processed_frame)
 

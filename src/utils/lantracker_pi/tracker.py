@@ -1,10 +1,13 @@
 import numpy as np
 import cv2
-from window import Window
-from line import Line
-from gradients import get_edges
-from perspective import flatten_perspective
-
+from src.utils.lantracker_pi.window import Window
+from src.utils.lantracker_pi.line import Line
+from src.utils.lantracker_pi.gradients import get_edges
+from src.utils.lantracker_pi.perspective import flatten_perspective
+# from window import Window
+# from line import Line
+# from gradients import get_edges
+# from perspective import flatten_perspective
 
 class LaneTracker(object):
     """
@@ -107,27 +110,47 @@ class LaneTracker(object):
         self.left.process_points(l_x, l_y)
         (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
         self.right.process_points(r_x, r_y)
+        # copy_frame=frame
+        offset, curvature = self.calculate_metrics(frame.shape)
+        print(offset, curvature)
 
         if draw_statistics:
             edges = get_edges(frame, separate_channels=True)
             debug_overlay = self.draw_debug_overlay(flatten_perspective(edges)[0])
+            cv2.imshow("Debug",debug_overlay)
+            key = cv2.waitKey(1)
             top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
+            cv2.imshow("Top", top_overlay)
+            key = cv2.waitKey(1)
             debug_overlay = cv2.resize(debug_overlay, (0, 0), fx=0.2, fy=0.2)
             top_overlay = cv2.resize(top_overlay, (0, 0), fx=0.2, fy=0.2)
             frame[:250, :, :] = frame[:250, :, :] * .4
             (h, w, _) = debug_overlay.shape
-            frame[20:20 + h, 20:20 + w, :] = debug_overlay
-            # frame[20:20 + h, 20 + 20 + w:20 + 20 + w + w, :] = top_overlay
-            frame[20 + 20 + h :20 + 20 + h + h, 20:20 + w, :] = top_overlay
+            # frame[20:20 + h, 20:20 + w, :] = debug_overlay
+            # # # frame[20:20 + h, 20 + 20 + w:20 + 20 + w + w, :] = top_overlay
+            # frame[20 + 20 + h :20 + 20 + h + h, 20:20 + w, :] = top_overlay
             text_x = 20 + w + 20 + 20
             self.draw_text(frame, 'radius curve:  {} m'.format(self.radius_of_curvature()), text_x, 70)
             self.draw_text(frame, 'Distance from center (left):  {:.1f} m'.format(self.left.camera_distance()), text_x, 130)
             self.draw_text(frame, 'Distance from center (right):  {:.1f} m'.format(self.right.camera_distance()), text_x, 190)
-
+        
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
+        return frame, offset, curvature
+    
+    def calculate_metrics(self, frame_shape):
 
-        return frame
+
+
+        # Calculate lane curvature
+        curvature = self.radius_of_curvature()
+
+        # Calculate lane center offset
+        lane_center = (self.left.get_points()[-1][0] + self.right.get_points()[-1][0]) / 2
+        frame_center = frame_shape[1] // 2
+        offset = (frame_center - lane_center) * 3.7 / 700  # Convert to meters
+
+        return offset, curvature
 
     def draw_text(self, frame, text, x, y):
         cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .6, (255, 255, 255), 2)
