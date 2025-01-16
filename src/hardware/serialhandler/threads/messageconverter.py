@@ -62,7 +62,36 @@ class MessageConverter:
         "vcd": [["speed", "steer", "time"], [3, 3, 3], [False]],
         "kl": [["mode"], [2], [False]]
     }
-    """ The 'commands' attribute is a dictionary, which contains key word and the acceptable format for each action type. """
+    """ The 'commands' attribute is a dictionary, which contains key word animport sys
+import subprocess
+
+sys.path.append(".")
+from multiprocessing import Queue, Event
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+# ===================================== PROCESS IMPORTS ==================================
+
+from src.gateway.processGateway import processGateway
+from src.dashboard.processDashboard import processDashboard
+from src.hardware.camera.processCamera import processCamera
+from src.hardware.serialhandler.processSerialHandler import processSerialHandler
+from src.data.Semaphores.Semaphores import processSemaphores
+from src.data.TrafficCommunication.processTrafficCommunication import processTrafficCommunication
+from src.utils.ipManager.IpReplacement import IPManager
+# ------ New component imports starts here ------#
+
+# ------ New component imports ends here ------#
+# ======================================== SETTING UP ====================================
+allProcesses = list()
+
+queueList = {
+    "Critical": Queue(),
+    "Warning": Queue(),
+    "General": Queue(),
+    "Config": Queue(),
+}d the acceptable format for each action type. """
 
     # ===================================== GET COMMAND ===================================
     def get_command(self, action, **kwargs):
@@ -90,7 +119,8 @@ class MessageConverter:
 
             for key in listKwargs:
                 value = kwargs.get(key)
-                command += str(value)+";"
+                command += str(value)+";"            self.serialCom.write(command_msg.encode("ascii"))
+
 
             command += ";\r\n"
             return command

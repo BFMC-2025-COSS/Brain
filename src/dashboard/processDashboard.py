@@ -128,6 +128,7 @@ class processDashboard(WorkerProcess):
 
         dataDict = json.loads(data)
         dataName = dataDict["Name"]
+        ## 예) 차량 모드 정보 :{"Name": "DrivingMode", "Value": "${this.states[index]}"}
         socketId = request.sid
         
         if dataName == "SessionAccess":

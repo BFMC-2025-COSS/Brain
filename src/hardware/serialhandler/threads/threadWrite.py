@@ -229,7 +229,7 @@ class threadWrite(ThreadWithStop):
 
     # ==================================== STOP ==========================================
     def stop(self):
-        """This function will close the thread and will stop the car."""
+        """This function will close the thread and will stop the car."""    
 
         self.exampleFlag = False
         command = {"action": "kl", "mode": 0.0}

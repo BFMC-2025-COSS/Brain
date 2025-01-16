@@ -155,7 +155,8 @@ class threadCamera(ThreadWithStop):
 
                 serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
 
-                _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
+                _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)    
+                ##               
                 _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
 
                 mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
