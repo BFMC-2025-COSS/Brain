@@ -112,7 +112,6 @@ class LaneTracker(object):
         self.right.process_points(r_x, r_y)
         # copy_frame=frame
         offset, curvature = self.calculate_metrics(frame.shape)
-        print(offset, curvature)
 
         if draw_statistics:
             edges = get_edges(frame, separate_channels=True)
@@ -120,8 +119,8 @@ class LaneTracker(object):
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
             top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
-            cv2.imshow("Top", top_overlay)
-            key = cv2.waitKey(1)
+            #cv2.imshow("Top", top_overlay)
+            #key = cv2.waitKey(1)
             debug_overlay = cv2.resize(debug_overlay, (0, 0), fx=0.2, fy=0.2)
             top_overlay = cv2.resize(top_overlay, (0, 0), fx=0.2, fy=0.2)
             frame[:250, :, :] = frame[:250, :, :] * .4

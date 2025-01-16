@@ -77,7 +77,7 @@ Dashboard = True
 Camera = False
 Semaphores = False
 TrafficCommunication = False
-SerialHandler = False
+SerialHandler = True
 
 # ------ New component flags starts here ------#
 Lanekeep = True

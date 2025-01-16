@@ -16,7 +16,7 @@ def flatten_perspective(image):
     # Get image dimensions
     (h, w) = (image.shape[0], image.shape[1])
     # Define source points
-    source = np.float32([[w // 2 - 110, h * .625], [w // 2 + 110, h * .625], [w // 2 - 160, h - 70], [w // 2 + 160, h - 70]])
+    source = np.float32([[w // 2 - 230 , h * .4], [w // 2 + 230, h * .4], [w // 2 - 320, h * .625], [w // 2 + 320, h * .625]])
     # Define corresponding destination points
     destination = np.float32([[100, 0], [w - 100, 0], [100, h], [w - 100, h]])
     transform_matrix = cv2.getPerspectiveTransform(source, destination)
