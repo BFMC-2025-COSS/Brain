@@ -255,4 +255,4 @@ class LaneSpeed(Enum):
     Queue = "General"
     Owner = "threadLanekeep"
     msgID = 2
-    msgType = "int"
+    msgType = "float"

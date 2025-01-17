@@ -119,8 +119,8 @@ class LaneTracker(object):
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
             top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
-            #cv2.imshow("Top", top_overlay)
-            #key = cv2.waitKey(1)
+            cv2.imshow("Top", top_overlay)
+            key = cv2.waitKey(1)
             debug_overlay = cv2.resize(debug_overlay, (0, 0), fx=0.2, fy=0.2)
             top_overlay = cv2.resize(top_overlay, (0, 0), fx=0.2, fy=0.2)
             frame[:250, :, :] = frame[:250, :, :] * .4

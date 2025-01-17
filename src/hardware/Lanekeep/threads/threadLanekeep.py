@@ -27,12 +27,12 @@ class threadLanekeep(ThreadWithStop):
         self.lanespeedSender = messageHandlerSender(self.queuesList, LaneSpeed)
 
     def map_f(self,x,in_min,in_max,out_min,out_max):
-        a= (x-in_min)*(out_max-out_min) / (in_max-in_min)+out_min
+        a= (x-in_min)*(out_max-out_min)*(-1) / (in_max-in_min)+out_min
         return a
 
     def run(self):
         picam2 = Picamera2()
-        config = picam2.create_preview_configuration()
+        config = picam2.create_preview_configuration(main={"size": (720,240)})
         picam2.configure(config)
         picam2.start()
         while self._running:
@@ -46,12 +46,13 @@ class threadLanekeep(ThreadWithStop):
                 #key =cv2.waitKey(1)
                 #if key == 27:
                 #    pass
-                # Calculate steering angle
+                print("offset:", offset)
+               # Calculate steering angle
                 steering_angle = self.calculate_steering_angle(offset, curvature)
                 speed = self.calculate_speed(steering_angle)
-                self.lanekeepingSender.send(flaot(steering_angle))
-                #print(steering_angle,speed)
-                self.lanespeedSender.send(speed)
+                self.lanekeepingSender.send(float(steering_angle))
+                print(float(steering_angle),float(speed))
+                self.lanespeedSender.send(float(speed))
 
             except Exception as e:
                 if self.debugging:

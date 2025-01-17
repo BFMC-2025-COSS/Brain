@@ -164,8 +164,14 @@ class threadWrite(ThreadWithStop):
 
                 if self.running:
                     if self.engineEnabled:
-                        
+                    ########################### YOLO ###########################
+                    
+
+
+
+                    ########################### LaneKeeping ###########################
                         laneRecv = self.lanekeepingSubscriber.receive()
+                        # print("lane:",laneRecv)
                         if laneRecv is not None:
                             print("serial")
                             if self.debugger:
