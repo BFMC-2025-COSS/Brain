@@ -29,17 +29,30 @@ class threadLanekeep(ThreadWithStop):
     def map_f(self,x,in_min,in_max,out_min,out_max):
         a= (x-in_min)*(out_max-out_min)*(-1) / (in_max-in_min)+out_min
         return a
+    
+    # Linear Mapping function
+    # def map_linear(offset, max_offset= 0.4 / 2, max_angle=200):
+    #     steering_angle = (offset / max_offset) * max_angle
+    #     return np.clip(steering_angle, -max_angle, max_angle)
+
+    # nonLinear Mapping function
+    # def map_nonlinear(offset, max_angle=200, alpha=5.0):
+    #     steering_angle = np.tanh(alpha * offset) * max_angle
+    #     return steering_angle
 
     def run(self):
         picam2 = Picamera2()
         config = picam2.create_preview_configuration(main={"size": (720,240)})
         picam2.configure(config)
         picam2.start()
+
+        frame =picam2.capture_array()
+        lane_track = LaneTracker(frame)
+        
         while self._running:
             try:
                 # Simulate receiving frame data (replace with actual frame capture)
                 frame =picam2.capture_array()
-                lane_track = LaneTracker(frame)
                 processed_frame, offset, curvature = lane_track.process(frame)
                 # Visualization
                 #cv2.imshow("Lane Tracking", processed_frame)
@@ -78,6 +91,8 @@ class threadLanekeep(ThreadWithStop):
         """
         #print("here")
         return self.map_f(offset,-0.254,0.1725,-100,100)
+        #return self.map_linear(offset)
+        #return self.map_nonlinear(offset)
 
     def calculate_speed(self, steering_angle, max_speed=100, min_speed=50):
         """

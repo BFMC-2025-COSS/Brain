@@ -110,7 +110,6 @@ class LaneTracker(object):
         self.left.process_points(l_x, l_y)
         (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
         self.right.process_points(r_x, r_y)
-        # copy_frame=frame
         offset, curvature = self.calculate_metrics(frame.shape)
 
         if draw_statistics:
@@ -130,25 +129,31 @@ class LaneTracker(object):
             # frame[20 + 20 + h :20 + 20 + h + h, 20:20 + w, :] = top_overlay
             text_x = 20 + w + 20 + 20
             self.draw_text(frame, 'radius curve:  {} m'.format(self.radius_of_curvature()), text_x, 70)
-            self.draw_text(frame, 'Distance from center (left):  {:.1f} m'.format(self.left.camera_distance()), text_x, 130)
-            self.draw_text(frame, 'Distance from center (right):  {:.1f} m'.format(self.right.camera_distance()), text_x, 190)
+            self.draw_text(frame, 'Distance from center (left):  {:.2f} cm'.format(self.left.camera_distance()), text_x, 130)
+            self.draw_text(frame, 'Distance from center (right):  {:.2f} cm'.format(self.right.camera_distance()), text_x, 190)
         
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
         return frame, offset, curvature
     
     def calculate_metrics(self, frame_shape):
-
-
-
         # Calculate lane curvature
         curvature = self.radius_of_curvature()
 
         # Calculate lane center offset
+        # Using only last window x pixels
         lane_center = (self.left.get_points()[-1][0] + self.right.get_points()[-1][0]) / 2
+        
+        # Using all window's x pixels
+        #lane_center = (np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2
+        
+        # Using weights average(more weights on near lane)
+        #weights = np.linspace(1, 0, len(self.left.get_points()))
+        #lane_center = (np.average(self.left.get_points()[:, 0], weights=weights) + np.average(self.right.get_points()[:, 0], weights=weights)) / 2
+        
         frame_center = frame_shape[1] // 2
-        offset = (frame_center - lane_center) * 3.7 / 700  # Convert to meters
-
+        offset = (frame_center - lane_center) * 40 / 700  # Convert to cm
+        print("offset: ",offset, "cm")
         return offset, curvature
 
     def draw_text(self, frame, text, x, y):

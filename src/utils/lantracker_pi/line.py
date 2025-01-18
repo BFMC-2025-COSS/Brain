@@ -104,6 +104,6 @@ class Line(object):
         Estimated distance to camera in meters.
         """
         points = self.get_points()
-        xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+        xm_per_pix = 40 / 700  # meters per pixel in x dimension
         x = points[np.max(points[:, 1])][0]
         return np.absolute((self.w // 2 - x) * xm_per_pix)
