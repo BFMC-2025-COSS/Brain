@@ -59,6 +59,7 @@ from src.data.Semaphores.Semaphores import processSemaphores
 from src.data.TrafficCommunication.processTrafficCommunication import processTrafficCommunication
 from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
+from src.hardware.YOLO.processYOLO import processYOLO
 from src.hardware.Lanekeep.processLanekeep import processLanekeep
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
@@ -80,7 +81,9 @@ TrafficCommunication = False
 SerialHandler = True
 
 # ------ New component flags starts here ------#
+YOLO = True
 Lanekeep = True
+
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -105,9 +108,14 @@ if Camera:
     processCamera = processCamera(queueList, logging , debugging = False)
     allProcesses.append(processCamera)
 
+if YOLO:
+    processYOLO_instance = processYOLO(queueList, logging, debugging=False)
+    allProcesses.append(processYOLO_instance)
+
 if Lanekeep:
     processLanekeep = processLanekeep(queueList, logging , debugging = False)
     allProcesses.append(processLanekeep)
+    
 # Initializing semaphores
 if Semaphores:
     processSemaphores = processSemaphores(queueList, logging, debugging = False)
@@ -129,7 +137,7 @@ if SerialHandler:
 
 # ===================================== START PROCESSES ==================================
 for process in allProcesses:
-    process.daemon = True
+    process.daemon = True # 프로세스가 메인 프로그램 종료와 함께 자동으로 종료되도록 설정
     process.start()
 
 # ===================================== STAYING ALIVE ====================================

@@ -38,6 +38,7 @@ from src.utils.messages.allMessages import (
     SteerMotor,
     SpeedMotor,
     Brake,
+    AEB,
     ToggleBatteryLvl,
     ToggleImuData,
     ToggleInstant,
@@ -86,6 +87,8 @@ class threadWrite(ThreadWithStop):
             self.example()
         
 
+        self.lastspeed = 0 # For Finishing AEB System
+
     def subscribe(self):
         """Subscribe function. In this function we make all the required subscribe to process gateway"""
 
@@ -94,6 +97,7 @@ class threadWrite(ThreadWithStop):
         self.steerMotorSubscriber = messageHandlerSubscriber(self.queuesList, SteerMotor, "lastOnly", True)
         self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, SpeedMotor, "lastOnly", True)
         self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
+        self.AEBSubscriber = messageHandlerSubscriber(self.queuesList, AEB, "lastOnly", True)
         self.instantSubscriber = messageHandlerSubscriber(self.queuesList, ToggleInstant, "lastOnly", True)
         self.batterySubscriber = messageHandlerSubscriber(self.queuesList, ToggleBatteryLvl, "lastOnly", True)
         self.resourceMonitorSubscriber = messageHandlerSubscriber(self.queuesList, ToggleResourceMonitor, "lastOnly", True)
@@ -165,9 +169,21 @@ class threadWrite(ThreadWithStop):
                 if self.running:
                     if self.engineEnabled:
                     ########################### YOLO ###########################
-                    
+                      aeb_signal = self.AEBSubscriber.receive()
+                        if aeb_signal is not None:# YOLO
+                            if self.debugger:
+                                self.logger.info(f"AEB signal received: {aeb_signal}")
+                            if aeb_signal == 0.0:
+                                if self.lastspeed > 0:
+                                    command = {"action": "speed", "speed": self.lastspeed}
+                                    self.sendToSerial(command)
 
+                            elif aeb_signal == 1.0:
+                                command = {"action": "brake", "steerAngle": 250}
+                                self.sendToSerial(command)
+                            
 
+                        brakeRecv = self.brakeSubscriber.receive()# other brake
 
                     ########################### LaneKeeping ###########################
                         laneRecv = self.lanekeepingSubscriber.receive()
@@ -189,6 +205,7 @@ class threadWrite(ThreadWithStop):
                             self.sendToSerial(command)
 
                         brakeRecv = self.brakeSubscriber.receive()
+                        
                         if brakeRecv is not None:
                             if self.debugger:
                                 self.logger.info(brakeRecv)
@@ -200,6 +217,7 @@ class threadWrite(ThreadWithStop):
                             if self.debugger:
                                 self.logger.info(speedRecv)
                             command = {"action": "speed", "speed": int(speedRecv)}
+                            self.lastspeed = int(speedRecv)
                             self.sendToSerial(command)
 
                         steerRecv = self.steerMotorSubscriber.receive()
@@ -251,6 +269,18 @@ class threadWrite(ThreadWithStop):
 
             except Exception as e:
                 print(e)
+
+    # def _send_brake_command(self, value):
+    #     """Send a brake command to the NUCLEO."""
+    #     try:
+    #         command = f"#BRAKE:{value};\r\n"
+    #         self.serialCom.write(command.encode("ascii"))
+    #         self.logFile.write(command)
+    #         if self.debugger:
+    #             self.logger.info(f"Sent brake command: {command}")
+    #     except Exception as e:
+    #         if self.debugger:
+    #             self.logger.error(f"Failed to send brake command: {e}")
 
     # ==================================== START =========================================
     def start(self):
