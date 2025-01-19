@@ -42,7 +42,9 @@ from src.utils.messages.allMessages import (
     ToggleBatteryLvl,
     ToggleImuData,
     ToggleInstant,
-    ToggleResourceMonitor
+    ToggleResourceMonitor,
+    LaneKeeping,
+    LaneSpeed
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -83,6 +85,7 @@ class threadWrite(ThreadWithStop):
             self.j = -1.0
             self.s = 0.0
             self.example()
+        
 
         self.lastspeed = 0 # For Finishing AEB System
 
@@ -99,6 +102,8 @@ class threadWrite(ThreadWithStop):
         self.batterySubscriber = messageHandlerSubscriber(self.queuesList, ToggleBatteryLvl, "lastOnly", True)
         self.resourceMonitorSubscriber = messageHandlerSubscriber(self.queuesList, ToggleResourceMonitor, "lastOnly", True)
         self.imuSubscriber = messageHandlerSubscriber(self.queuesList, ToggleImuData, "lastOnly", True)
+        self.lanekeepingSubscriber = messageHandlerSubscriber(self.queuesList, LaneKeeping, "lastOnly", True)
+        self.lanespeedSubscriber = messageHandlerSubscriber(self.queuesList, LaneSpeed, "lastOnly", True)
 
     # ==================================== SENDING =======================================
 
@@ -163,7 +168,8 @@ class threadWrite(ThreadWithStop):
 
                 if self.running:
                     if self.engineEnabled:
-                        aeb_signal = self.AEBSubscriber.receive()
+                    ########################### YOLO ###########################
+                      aeb_signal = self.AEBSubscriber.receive()
                         if aeb_signal is not None:# YOLO
                             if self.debugger:
                                 self.logger.info(f"AEB signal received: {aeb_signal}")
@@ -178,6 +184,28 @@ class threadWrite(ThreadWithStop):
                             
 
                         brakeRecv = self.brakeSubscriber.receive()# other brake
+
+                    ########################### LaneKeeping ###########################
+                        laneRecv = self.lanekeepingSubscriber.receive()
+                        # print("lane:",laneRecv)
+                        if laneRecv is not None:
+                            print("serial")
+                            if self.debugger:
+                                self.logger.info(laneRecv)
+                            command = {"action": "steer", "steerAngle": int(laneRecv)}
+                            print("steer: ",int(laneRecv))
+                            self.sendToSerial(command)
+
+                        laneRecv_speed = self.lanespeedSubscriber.receive()
+                        if laneRecv_speed is not None:
+                            if self.debugger:
+                                self.logger.info(laneRecv_speed)
+                            command = {"action": "speed", "speed": int(laneRecv_speed)}
+                            print("speed: ",int(laneRecv_speed))
+                            self.sendToSerial(command)
+
+                        brakeRecv = self.brakeSubscriber.receive()
+                        
                         if brakeRecv is not None:
                             if self.debugger:
                                 self.logger.info(brakeRecv)

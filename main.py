@@ -60,6 +60,7 @@ from src.data.TrafficCommunication.processTrafficCommunication import processTra
 from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 from src.hardware.YOLO.processYOLO import processYOLO
+from src.hardware.Lanekeep.processLanekeep import processLanekeep
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -81,7 +82,8 @@ SerialHandler = True
 
 # ------ New component flags starts here ------#
 YOLO = True
- 
+Lanekeep = True
+
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -110,6 +112,10 @@ if YOLO:
     processYOLO_instance = processYOLO(queueList, logging, debugging=False)
     allProcesses.append(processYOLO_instance)
 
+if Lanekeep:
+    processLanekeep = processLanekeep(queueList, logging , debugging = False)
+    allProcesses.append(processLanekeep)
+    
 # Initializing semaphores
 if Semaphores:
     processSemaphores = processSemaphores(queueList, logging, debugging = False)

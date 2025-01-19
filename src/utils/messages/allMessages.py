@@ -250,3 +250,15 @@ class AEB(Enum):
     Owner = "threadYOLO"
     msgID = 1
     msgType = "float"
+    
+class LaneKeeping(Enum):
+    Queue = "General"
+    Owner = "threadLanekeep"
+    msgID = 1
+    msgType = "float"
+
+class LaneSpeed(Enum):
+    Queue = "General"
+    Owner = "threadLanekeep"
+    msgID = 2
+    msgType = "float"
