@@ -245,3 +245,14 @@ class WarningSignal(Enum):
     msgType = "str"
 
 ### It will have this format: {"WarningName":"name1", "WarningID": 1}
+class LaneKeeping(Enum):
+    Queue = "General"
+    Owner = "threadLanekeep"
+    msgID = 1
+    msgType = "float"
+
+class LaneSpeed(Enum):
+    Queue = "General"
+    Owner = "threadLanekeep"
+    msgID = 2
+    msgType = "float"
