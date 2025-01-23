@@ -28,7 +28,7 @@ class threadYOLO(ThreadWithStop):
         """YOLO Model Load"""
         #device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # For Jetson
         device = torch.device("cpu") # For RPI
-        model_path="/home/pi/Brain/pt/640_ped+human.pt"
+        model_path="/home/pi/Brain/pt/11class_TrafficSign.pt"
         model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, device = device)
         model.conf = 0.25
         model.iou = 0.45

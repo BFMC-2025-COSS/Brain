@@ -85,8 +85,8 @@ class Line(object):
         Estimated radius of curvature in meters.
         """
         # Define conversions in x and y from pixels space to meters
-        ym_per_pix = 27 / 720  # meters per pixel in y dimension
-        xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+        ym_per_pix = 74 / 540  # cm / pixels
+        xm_per_pix = 35 / 352  # cm / pixels
         # Fit new polynomials to x,y in world space
         points = self.get_points()
         y = points[:, 1]

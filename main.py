@@ -81,7 +81,7 @@ TrafficCommunication = False
 SerialHandler = True
 
 # ------ New component flags starts here ------#
-YOLO = True
+YOLO = False
 Lanekeep = True
 
 # ------ New component flags ends here ------#
@@ -113,7 +113,7 @@ if YOLO:
     allProcesses.append(processYOLO_instance)
 
 if Lanekeep:
-    processLanekeep = processLanekeep(queueList, logging , debugging = False)
+    processLanekeep = processLanekeep(queueList, logging, debugging = False)
     allProcesses.append(processLanekeep)
     
 # Initializing semaphores

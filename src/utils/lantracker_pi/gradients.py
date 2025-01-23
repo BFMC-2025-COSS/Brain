@@ -122,9 +122,14 @@ def get_edges(image, separate_channels=False):
     magnitude = gradient_magnitude_mask(s_channel, sobel_kernel=3, threshold=(20, 100))
     direction = gradient_direction_mask(s_channel, sobel_kernel=3, threshold=(0.7, 1.3))
     gradient_mask = np.zeros_like(s_channel)
-    gradient_mask[((gradient_x == 1) & (gradient_y == 1)) | ((magnitude == 1) & (direction == 1))] = 1
+
+    #More Clean
+    gradient_mask[((gradient_x == 1) & (magnitude == 1) & (direction == 1)) | ((gradient_x == 1) & (gradient_y == 1))] = 1
+    
+    #gradient_mask[((gradient_x == 1) & (gradient_y == 1)) | ((magnitude == 1) & (direction == 1))] = 1
+    
     # Get a color thresholding mask
-    color_mask = color_threshold_mask(s_channel, threshold=(170, 255))
+    color_mask = color_threshold_mask(s_channel, threshold=(200, 255))
 
     if separate_channels:
         return np.dstack((np.zeros_like(s_channel), gradient_mask, color_mask))
@@ -132,3 +137,42 @@ def get_edges(image, separate_channels=False):
         mask = np.zeros_like(gradient_mask)
         mask[(gradient_mask == 1) | (color_mask == 1)] = 1
         return mask
+
+def optimized_get_edges(image):
+    # Convert to HLS color space and separate the S channel
+    hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS).astype(np.float32)
+    s_channel = hls[:, :, 1]
+
+    # Downsample the S channel to reduce computation
+    s_channel_downsampled = cv2.pyrDown(s_channel)
+
+    # Apply Sobel operations only once and reuse results
+    sobel_x = cv2.Sobel(s_channel_downsampled, cv2.CV_64F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(s_channel_downsampled, cv2.CV_64F, 0, 1, ksize=3)
+
+    # Compute gradient magnitude and direction
+    gradient_magnitude = np.sqrt(sobel_x**2 + sobel_y**2).astype(np.uint8)
+    gradient_direction = cv2.phase(sobel_x, sobel_y, angleInDegrees=False)
+
+    # Create binary masks based on thresholds
+    gradient_x_mask = (np.abs(sobel_x) > 20).astype(np.uint8)
+    gradient_y_mask = (np.abs(sobel_y) > 20).astype(np.uint8)
+    magnitude_mask = (gradient_magnitude > 20).astype(np.uint8)
+    direction_mask = ((gradient_direction > 0.7) & (gradient_direction < 1.3)).astype(np.uint8)
+
+    # Combine all masks
+    combined_gradient_mask = cv2.bitwise_or(
+        cv2.bitwise_and(gradient_x_mask, gradient_y_mask),
+        cv2.bitwise_and(gradient_x_mask, magnitude_mask, direction_mask)
+    )
+
+    # Color threshold mask
+    color_mask = (s_channel_downsampled > 200).astype(np.uint8)
+
+    # Combine gradient and color masks
+    final_mask = cv2.bitwise_or(combined_gradient_mask, color_mask)
+
+    # Upsample back to original resolution
+    final_mask_upsampled = cv2.pyrUp(final_mask).astype(np.uint8)
+
+    return final_mask_upsampled
