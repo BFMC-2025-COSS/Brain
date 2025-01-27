@@ -1,9 +1,11 @@
 import numpy as np
 import cv2
+from concurrent.futures import ThreadPoolExecutor
 from src.utils.lantracker_pi.window import Window
 from src.utils.lantracker_pi.line import Line
-from src.utils.lantracker_pi.gradients import get_edges
+from src.utils.lantracker_pi.gradients import get_edges, optimized_get_edges
 from src.utils.lantracker_pi.perspective import flatten_perspective
+import time
 # from window import Window
 # from line import Line
 # from gradients import get_edges
@@ -40,8 +42,9 @@ class LaneTracker(object):
         frame   : Frame to scan for lane edges.
         """
         # Take a histogram of the bottom half of the image
-        edges = get_edges(frame)
+        edges = optimized_get_edges(frame)
         (flat_edges, _) = flatten_perspective(edges)
+
         histogram = np.sum(flat_edges[int(self.h / 2):, :], axis=0)
 
         nonzero = flat_edges.nonzero()
@@ -90,6 +93,41 @@ class LaneTracker(object):
             window_x = window.mean_x
         return (nonzero[1][indices], nonzero[0][indices])
 
+    def predict_missing_lane(self, visible_lane, lane_width, direction="right"):
+        """
+        Predicts the missing lane using the visible lane and the lane width.
+
+        Parameters
+        ----------
+        visible_lane : Line
+            The visible lane (left or right).
+        lane_width : int
+            The distance (in pixels) between the two lanes.
+        direction : str
+            "left" or "right", indicating which lane is missing.
+
+        Returns
+        -------
+        np.ndarray
+            Predicted points for the missing lane.
+        """
+        visible_points = visible_lane.get_points()  
+        if direction == "right":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] += lane_width  
+        elif direction == "left":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] -= lane_width  
+        return predicted_points
+
+    def update_missing_windows(self, missing_windows, reference_windows, direction="left", lane_width=352):
+        for missing_window, reference_window in zip(missing_windows, reference_windows):
+            if direction == "left":
+                missing_window.x = reference_window.x - lane_width
+            elif direction == "right":
+                missing_window.x = reference_window.x + lane_width
+
+
     def process(self, frame, draw_lane=True, draw_statistics=True):
         """
         Performs a full lane tracking pipeline on a frame.
@@ -104,37 +142,56 @@ class LaneTracker(object):
         -------
         Resulting frame.
         """
-        edges = get_edges(frame)
+        edges = optimized_get_edges(frame)
         (flat_edges, unwarp_matrix) = flatten_perspective(edges)
-        (l_x, l_y) = self.scan_frame_with_windows(flat_edges, self.l_windows)
-        self.left.process_points(l_x, l_y)
-        (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
-        self.right.process_points(r_x, r_y)
-        offset, curvature = self.calculate_metrics(frame.shape)
 
+
+        (l_x, l_y) = self.scan_frame_with_windows(flat_edges, self.l_windows)
+        # self.left.process_points(l_x, l_y)
+        (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
+        # self.right.process_points(r_x, r_y)
+
+        # print("l: ",len(l_x),"r: ", len(r_x))
+        left_visible = len(l_x) > 8000
+        right_visible = len(r_x) > 8000
+
+        if not left_visible and right_visible:
+            self.update_missing_windows(self.l_windows, self.r_windows, direction="left", lane_width=530)
+
+            predicted_left_points = self.predict_missing_lane(self.right, lane_width=530, direction="left")
+            self.left.process_points(predicted_left_points[:, 0], predicted_left_points[:, 1])
+            self.right.process_points(r_x, r_y)
+        elif not right_visible and left_visible:
+            self.update_missing_windows(self.r_windows, self.l_windows, direction="right", lane_width=530)
+
+            predicted_right_points = self.predict_missing_lane(self.left, lane_width=530, direction="right")
+            self.right.process_points(predicted_right_points[:, 0], predicted_right_points[:, 1])
+            self.left.process_points(l_x, l_y)
+
+        else:
+            self.left.process_points(l_x, l_y)
+            self.right.process_points(r_x, r_y)
+
+        offset, curvature = self.calculate_metrics(frame.shape)
+        
         if draw_statistics:
-            edges = get_edges(frame, separate_channels=True)
-            debug_overlay = self.draw_debug_overlay(flatten_perspective(edges)[0])
+            debug_overlay = self.draw_debug_overlay(flat_edges)
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
+
             top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
+            lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
+            frame_center = top_overlay.shape[1] // 2
+            cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
+            cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
             cv2.imshow("Top", top_overlay)
             key = cv2.waitKey(1)
-            debug_overlay = cv2.resize(debug_overlay, (0, 0), fx=0.2, fy=0.2)
-            top_overlay = cv2.resize(top_overlay, (0, 0), fx=0.2, fy=0.2)
-            frame[:250, :, :] = frame[:250, :, :] * .4
-            (h, w, _) = debug_overlay.shape
-            # frame[20:20 + h, 20:20 + w, :] = debug_overlay
-            # # # frame[20:20 + h, 20 + 20 + w:20 + 20 + w + w, :] = top_overlay
-            # frame[20 + 20 + h :20 + 20 + h + h, 20:20 + w, :] = top_overlay
-            text_x = 20 + w + 20 + 20
-            self.draw_text(frame, 'radius curve:  {} m'.format(self.radius_of_curvature()), text_x, 70)
-            self.draw_text(frame, 'Distance from center (left):  {:.2f} cm'.format(self.left.camera_distance()), text_x, 130)
-            self.draw_text(frame, 'Distance from center (right):  {:.2f} cm'.format(self.right.camera_distance()), text_x, 190)
-        
+
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
+
         return frame, offset, curvature
+
     
     def calculate_metrics(self, frame_shape):
         # Calculate lane curvature
@@ -142,19 +199,20 @@ class LaneTracker(object):
 
         # Calculate lane center offset
         # Using only last window x pixels
-        lane_center = (self.left.get_points()[-1][0] + self.right.get_points()[-1][0]) / 2
+        #lane_center = (self.left.get_points()[0][0] + self.right.get_points()[0][0]) / 2
         
         # Using all window's x pixels
-        #lane_center = (np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2
+        lane_center = (np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2
         
         # Using weights average(more weights on near lane)
         #weights = np.linspace(1, 0, len(self.left.get_points()))
         #lane_center = (np.average(self.left.get_points()[:, 0], weights=weights) + np.average(self.right.get_points()[:, 0], weights=weights)) / 2
         
         frame_center = frame_shape[1] // 2
-        offset = (frame_center - lane_center) * 40 / 700  # Convert to cm
-        print("offset: ",offset, "cm")
+        offset = (frame_center - lane_center) * 35 / 352  # Convert to cm in BFMC Format(35cm, 960x540=352pixels)
         return offset, curvature
+
+
 
     def draw_text(self, frame, text, x, y):
         cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .6, (255, 255, 255), 2)
