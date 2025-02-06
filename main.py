@@ -75,14 +75,14 @@ queueList = {
 logging = logging.getLogger()
 
 Dashboard = True
-Camera = False
+Camera = True
 Semaphores = False
 TrafficCommunication = False
-SerialHandler = True
+SerialHandler = False
 
 # ------ New component flags starts here ------#
 YOLO = False
-Lanekeep = True
+Lanekeep = False
 
 # ------ New component flags ends here ------#
 

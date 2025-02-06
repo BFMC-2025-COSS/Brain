@@ -1,7 +1,7 @@
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.allMessages import AEB
-from picamera2 import Picamera2
+#from picamera2 import Picamera2
 import cv2
 import torch
 # from utils.general import non_max_suppression

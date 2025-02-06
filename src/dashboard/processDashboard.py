@@ -165,7 +165,8 @@ class processDashboard(WorkerProcess):
     def sendContinuousHardwareData(self):   
         self.memoryUsage = psutil.virtual_memory().percent
         self.cpuCoreUsage = psutil.cpu_percent(interval=1, percpu=True)
-        self.cpuTemperature = round(psutil.sensors_temperatures()['cpu_thermal'][0].current)
+        #self.cpuTemperature = round(psutil.sensors_temperatures()['cpu_thermal'][0].current)
+        self.cpuTemperature = 0.0
         threading.Timer(1, self.sendContinuousHardwareData).start()
 
     def sendContinuousMessages(self):

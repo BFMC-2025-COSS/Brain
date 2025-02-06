@@ -8,7 +8,7 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.allMessages import LaneKeeping, LaneSpeed
 from src.utils.lantracker_pi.tracker import LaneTracker
-from picamera2 import Picamera2
+#from picamera2 import Picamera2
 
 
 class threadLanekeep(ThreadWithStop):
