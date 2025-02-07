@@ -1,0 +1,6 @@
+train: /home/jo/yolov5/dataset/images/train
+val: /home/jo/yolov5/dataset/images/valid
+
+nc: <2>  # 클래스 수
+names: ['BFMC_pedestrian','person']  # 클래스 이름
+

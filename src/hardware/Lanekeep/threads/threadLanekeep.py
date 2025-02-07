@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+import pyrealsense2 as rs
+
 import time
 import base64
 from src.templates.threadwithstop import ThreadWithStop
@@ -8,8 +10,9 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.allMessages import LaneKeeping, LaneSpeed
 from src.utils.lantracker_pi.tracker import LaneTracker
+from src.hardware.Lanekeep.threads.utils import OptimizedLaneNet
 #from picamera2 import Picamera2
-
+import torch
 
 class threadLanekeep(ThreadWithStop):
     """This thread handles Lanekeep.
@@ -26,13 +29,26 @@ class threadLanekeep(ThreadWithStop):
         self.debugging = debugging
         self.lanekeepingSender = messageHandlerSender(self.queuesList, LaneKeeping)
         self.lanespeedSender = messageHandlerSender(self.queuesList, LaneSpeed)
-
         self.cameraSubscriber = messageHandlerSubscriber(self.queuesList, mainCamera,"fifo",True)
+        self.model = self._load_model()
+        self.pipeline = self._init_camera()
 
     #def map_f(self,x,in_min,in_max,out_min,out_max):
     #    a= (x-in_min)*(out_max-out_min)*(-1) / (in_max-in_min)+out_min
     #    return a
     
+    def _load_model(self):
+        start = time.time()
+        model = OptimizedLaneNet()
+        model_path = "src/hardware/Lanekeep/threads/best_finetuned_model.pt"
+        model.load_state_dict(torch.load(model_path))
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+        model.eval()
+        end = time.time()
+        print(f"Model Load Time: {end-start:.2f}s")
+        return model
+
      #Linear Mapping function
     def map_linear(self,offset, max_offset= 17.5, max_angle=200):
          steering = (offset/max_offset) * max_angle *(-1)
@@ -49,104 +65,70 @@ class threadLanekeep(ThreadWithStop):
 
         return steering_angle
 
+    def _init_camera(self):
+        """Camera Initialization"""
+        pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_stream(rs.stream.color, 480, 270, rs.format.bgr8, 30)
+        pipeline.start(config)
+        return pipeline
+    
+    def _get_frame(self):
+        """Frame capture with camera"""
+        frames = self.pipeline.wait_for_frames()
+        color_frame = frames.get_color_frame()
+        if not color_frame:
+            return None
+        frame = np.asanyarray(color_frame.get_data())
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     def run(self):
-        picam2 = Picamera2()
-        config = picam2.create_preview_configuration(main={"size": (960,540)})
-        picam2.configure(config)
-        picam2.start()
-
-        frame =picam2.capture_array()
-        lane_track = LaneTracker(frame)
-        # lane_track = None
-        # picam2=None
+        #lane_track = LaneTracker(np.asanyarray(frame.get_data()))
 
         use_camera = True
-        
-
-        # if use_camera:
-            # picam2 = Picamera2()
-            # config = picam2.create_preview_configuration()
-            # config = picam2.create_preview_configuration(main={"size": (960, 540)})
-            # picam2.configure(config)
-            # picam2.start()
 
         while self._running:
             try:
+                frame = self._get_frame()
+                if frame is None:
+                    continue
+                #frame = cv2.resize(frame, (480,270))
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                input_image = torch.tensor(frame / 255.0, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(device)
                 start = time.time()
-                if use_camera:
-                    frame = picam2.capture_array()
-                    #frame = cv2.resize(frame, (640,480))
-                else:
-                    camera_data = self.cameraSubscriber.receive()
-                    if not camera_data:
-                        continue
-                    frame_data = np.frombuffer(base64.b64decode(camera_data), dtype=np.uint8)
-                    frame = cv2.imdecode(frame_data, cv2.IMREAD_GRAYSCALE)
+                with torch.no_grad():
+                    output = self.model(input_image)
+                    output = output.squeeze().cpu().numpy()
+                print("lane: ",time.time() - start)
+                mask = (output > 0.2).astype(np.uint8) * 255
+                cv2.imshow("frame", frame)
+                cv2.imshow("mask", mask)
+                if cv2.waitKey(10) & 0xFF == ord('q'):
+                    break
+                # frame = np.asanyarray(frame.get_data())
+                # start = time.time()
+                # frames = self.pipeline.wait_for_frames()
+                # frame = frames.get_color_frame()
+                # if not frame:
+                #     continue
 
-                if use_camera:
-                    # lane_track = LaneTracker(frame)                    
-                    processed_frame, offset, curvature = lane_track.process(frame,True,True)
-                    #cv2.imshow("Lane Tracking", frame)
-                    #key =cv2.waitKey(1)
-                else:
-                    lane_track = LaneTracker(frame)
-                    processed_frame, offset, curvature = lane_track.process(frame,False,False)
-                steering_angle = self.calculate_steering_angle(offset,curvature)
-                speed = self.calculate_speed(steering_angle)
+                # frame = np.asanyarray(frame.get_data())
+                # processed_frame, offset, curvature = lane_track.process(frame, True, True)
+                # steering_angle = self.calculate_steering_angle(offset, curvature)
+                # speed = self.calculate_speed(steering_angle)
 
-                print("angle:",steering_angle,"speed:",speed)
-                self.lanekeepingSender.send(float(steering_angle))
-                self.lanespeedSender.send(float(speed))
-                print(time.time()-start)
+                # print("angle:", steering_angle, "speed:", speed)
+                # self.lanekeepingSender.send(float(steering_angle))
+                # self.lanespeedSender.send(float(speed))
+                # print(time.time() - start)
 
             except Exception as e:
                 if self.debugging:
                     self.logging.error(f"Error in lane tracking: {e}")
-        if use_camera:
-            picam2.stop()
-            cv2.destroyAllWindows()
+
+        self.pipeline.stop()
+        cv2.destroyAllWindows()
         
-
-                # if camera_data:
-                    
-                    
-                #     start = time.time()
-                    
-                #     end = time.time()
-                    
-                    # if checksum:
-                    #     self.lanekeepingSender.send(float(150.0))
-                    #     checksum=checksum-1
-                    #     print(150)
-                    # elif checksum==0:
-                    #     self.lanekeepingSender.send(float(-150.0))
-                    #     checksum=checksum+1
-                    #     print(-150)
-                    
-
-                    # self.lanekeepingSender.send(float(steering_angle))
-                    # self.lanespeedSender.send(float(speed))
-
-                # Simulate receiving frame data (replace with actual frame capture)
-                ###frame =picam2.capture_array()
-                #lane_track = LaneTracker(frame)
-                ###processed_frame, offset, curvature = lane_track.process(frame)
-                # Visualization
-                # cv2.imshow("Lane Tracking", processed_frame)
-                # key =cv2.waitKey(1)
-                # if key == 27:
-                #    pass
-                ###print("offset:", offset)
-               # Calculate steering angle
-                ###steering_angle = self.calculate_steering_angle(offset)
-                ###speed = self.calculate_speed(steering_angle)
-                
-                #self.lanekeepingSender.send(float(steering_angle))
-                
-                # self.lanespeedSender.send(float(speed))
-                ###print("angle:",steering_angle,"speed:",speed)
-                # time.sleep(1)
 
             
                 
