@@ -194,7 +194,7 @@ class BaseModel(nn.Module):
                 m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 delattr(m, "bn")  # remove batchnorm
                 m.forward = m.forward_fuse  # update forward
-        self.info()
+        #self.info()
         return self
 
     def info(self, verbose=False, img_size=640):

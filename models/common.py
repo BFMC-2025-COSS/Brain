@@ -491,21 +491,21 @@ class DetectMultiBackend(nn.Module):
             names = model.module.names if hasattr(model, "module") else model.names  # get class names
             model.half() if fp16 else model.float()
             self.model = model  # explicitly assign for to(), cpu(), cuda(), half()
-        elif jit:  # TorchScript
-            LOGGER.info(f"Loading {w} for TorchScript inference...")
-            extra_files = {"config.txt": ""}  # model metadata
-            model = torch.jit.load(w, _extra_files=extra_files, map_location=device)
-            model.half() if fp16 else model.float()
-            if extra_files["config.txt"]:  # load metadata dict
-                d = json.loads(
-                    extra_files["config.txt"],
-                    object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()},
-                )
-                stride, names = int(d["stride"]), d["names"]
-        elif dnn:  # ONNX OpenCV DNN
-            LOGGER.info(f"Loading {w} for ONNX OpenCV DNN inference...")
-            check_requirements("opencv-python>=4.5.4")
-            net = cv2.dnn.readNetFromONNX(w)
+        # elif jit:  # TorchScript
+        #     LOGGER.info(f"Loading {w} for TorchScript inference...")
+        #     extra_files = {"config.txt": ""}  # model metadata
+        #     model = torch.jit.load(w, _extra_files=extra_files, map_location=device)
+        #     model.half() if fp16 else model.float()
+        #     if extra_files["config.txt"]:  # load metadata dict
+        #         d = json.loads(
+        #             extra_files["config.txt"],
+        #             object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()},
+        #         )
+        #         stride, names = int(d["stride"]), d["names"]
+        # elif dnn:  # ONNX OpenCV DNN
+        #     LOGGER.info(f"Loading {w} for ONNX OpenCV DNN inference...")
+        #     check_requirements("opencv-python>=4.5.4")
+        #     net = cv2.dnn.readNetFromONNX(w)
         elif onnx:  # ONNX Runtime
             LOGGER.info(f"Loading {w} for ONNX Runtime inference...")
             check_requirements(("onnx", "onnxruntime-gpu" if cuda else "onnxruntime"))
@@ -517,22 +517,22 @@ class DetectMultiBackend(nn.Module):
             meta = session.get_modelmeta().custom_metadata_map  # metadata
             if "stride" in meta:
                 stride, names = int(meta["stride"]), eval(meta["names"])
-        elif xml:  # OpenVINO
-            LOGGER.info(f"Loading {w} for OpenVINO inference...")
-            check_requirements("openvino>=2023.0")  # requires openvino-dev: https://pypi.org/project/openvino-dev/
-            from openvino.runtime import Core, Layout, get_batch
+        # elif xml:  # OpenVINO
+        #     LOGGER.info(f"Loading {w} for OpenVINO inference...")
+        #     check_requirements("openvino>=2023.0")  # requires openvino-dev: https://pypi.org/project/openvino-dev/
+        #     from openvino.runtime import Core, Layout, get_batch
 
-            core = Core()
-            if not Path(w).is_file():  # if not *.xml
-                w = next(Path(w).glob("*.xml"))  # get *.xml file from *_openvino_model dir
-            ov_model = core.read_model(model=w, weights=Path(w).with_suffix(".bin"))
-            if ov_model.get_parameters()[0].get_layout().empty:
-                ov_model.get_parameters()[0].set_layout(Layout("NCHW"))
-            batch_dim = get_batch(ov_model)
-            if batch_dim.is_static:
-                batch_size = batch_dim.get_length()
-            ov_compiled_model = core.compile_model(ov_model, device_name="AUTO")  # AUTO selects best available device
-            stride, names = self._load_metadata(Path(w).with_suffix(".yaml"))  # load metadata
+        #     core = Core()
+        #     if not Path(w).is_file():  # if not *.xml
+        #         w = next(Path(w).glob("*.xml"))  # get *.xml file from *_openvino_model dir
+        #     ov_model = core.read_model(model=w, weights=Path(w).with_suffix(".bin"))
+        #     if ov_model.get_parameters()[0].get_layout().empty:
+        #         ov_model.get_parameters()[0].set_layout(Layout("NCHW"))
+        #     batch_dim = get_batch(ov_model)
+        #     if batch_dim.is_static:
+        #         batch_size = batch_dim.get_length()
+        #     ov_compiled_model = core.compile_model(ov_model, device_name="AUTO")  # AUTO selects best available device
+        #     stride, names = self._load_metadata(Path(w).with_suffix(".yaml"))  # load metadata
         elif engine:  # TensorRT
             LOGGER.info(f"Loading {w} for TensorRT inference...")
             import tensorrt as trt  # https://developer.nvidia.com/nvidia-tensorrt-download
@@ -581,90 +581,90 @@ class DetectMultiBackend(nn.Module):
                 bindings[name] = Binding(name, dtype, shape, im, int(im.data_ptr()))
             binding_addrs = OrderedDict((n, d.ptr) for n, d in bindings.items())
             batch_size = bindings["images"].shape[0]  # if dynamic, this is instead max batch size
-        elif coreml:  # CoreML
-            LOGGER.info(f"Loading {w} for CoreML inference...")
-            import coremltools as ct
+        # elif coreml:  # CoreML
+        #     LOGGER.info(f"Loading {w} for CoreML inference...")
+        #     import coremltools as ct
 
-            model = ct.models.MLModel(w)
-        elif saved_model:  # TF SavedModel
-            LOGGER.info(f"Loading {w} for TensorFlow SavedModel inference...")
-            import tensorflow as tf
+        #     model = ct.models.MLModel(w)
+        # elif saved_model:  # TF SavedModel
+        #     LOGGER.info(f"Loading {w} for TensorFlow SavedModel inference...")
+        #     import tensorflow as tf
 
-            keras = False  # assume TF1 saved_model
-            model = tf.keras.models.load_model(w) if keras else tf.saved_model.load(w)
-        elif pb:  # GraphDef https://www.tensorflow.org/guide/migrate#a_graphpb_or_graphpbtxt
-            LOGGER.info(f"Loading {w} for TensorFlow GraphDef inference...")
-            import tensorflow as tf
+        #     keras = False  # assume TF1 saved_model
+        #     model = tf.keras.models.load_model(w) if keras else tf.saved_model.load(w)
+        # elif pb:  # GraphDef https://www.tensorflow.org/guide/migrate#a_graphpb_or_graphpbtxt
+        #     LOGGER.info(f"Loading {w} for TensorFlow GraphDef inference...")
+        #     import tensorflow as tf
 
-            def wrap_frozen_graph(gd, inputs, outputs):
-                """Wraps a TensorFlow GraphDef for inference, returning a pruned function."""
-                x = tf.compat.v1.wrap_function(lambda: tf.compat.v1.import_graph_def(gd, name=""), [])  # wrapped
-                ge = x.graph.as_graph_element
-                return x.prune(tf.nest.map_structure(ge, inputs), tf.nest.map_structure(ge, outputs))
+        #     def wrap_frozen_graph(gd, inputs, outputs):
+        #         """Wraps a TensorFlow GraphDef for inference, returning a pruned function."""
+        #         x = tf.compat.v1.wrap_function(lambda: tf.compat.v1.import_graph_def(gd, name=""), [])  # wrapped
+        #         ge = x.graph.as_graph_element
+        #         return x.prune(tf.nest.map_structure(ge, inputs), tf.nest.map_structure(ge, outputs))
 
-            def gd_outputs(gd):
-                """Generates a sorted list of graph outputs excluding NoOp nodes and inputs, formatted as '<name>:0'."""
-                name_list, input_list = [], []
-                for node in gd.node:  # tensorflow.core.framework.node_def_pb2.NodeDef
-                    name_list.append(node.name)
-                    input_list.extend(node.input)
-                return sorted(f"{x}:0" for x in list(set(name_list) - set(input_list)) if not x.startswith("NoOp"))
+        #     def gd_outputs(gd):
+        #         """Generates a sorted list of graph outputs excluding NoOp nodes and inputs, formatted as '<name>:0'."""
+        #         name_list, input_list = [], []
+        #         for node in gd.node:  # tensorflow.core.framework.node_def_pb2.NodeDef
+        #             name_list.append(node.name)
+        #             input_list.extend(node.input)
+        #         return sorted(f"{x}:0" for x in list(set(name_list) - set(input_list)) if not x.startswith("NoOp"))
 
-            gd = tf.Graph().as_graph_def()  # TF GraphDef
-            with open(w, "rb") as f:
-                gd.ParseFromString(f.read())
-            frozen_func = wrap_frozen_graph(gd, inputs="x:0", outputs=gd_outputs(gd))
-        elif tflite or edgetpu:  # https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
-            try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
-                from tflite_runtime.interpreter import Interpreter, load_delegate
-            except ImportError:
-                import tensorflow as tf
+        #     gd = tf.Graph().as_graph_def()  # TF GraphDef
+        #     with open(w, "rb") as f:
+        #         gd.ParseFromString(f.read())
+        #     frozen_func = wrap_frozen_graph(gd, inputs="x:0", outputs=gd_outputs(gd))
+        # elif tflite or edgetpu:  # https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+        #     try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
+        #         from tflite_runtime.interpreter import Interpreter, load_delegate
+        #     except ImportError:
+        #         import tensorflow as tf
 
-                Interpreter, load_delegate = (
-                    tf.lite.Interpreter,
-                    tf.lite.experimental.load_delegate,
-                )
-            if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
-                LOGGER.info(f"Loading {w} for TensorFlow Lite Edge TPU inference...")
-                delegate = {"Linux": "libedgetpu.so.1", "Darwin": "libedgetpu.1.dylib", "Windows": "edgetpu.dll"}[
-                    platform.system()
-                ]
-                interpreter = Interpreter(model_path=w, experimental_delegates=[load_delegate(delegate)])
-            else:  # TFLite
-                LOGGER.info(f"Loading {w} for TensorFlow Lite inference...")
-                interpreter = Interpreter(model_path=w)  # load TFLite model
-            interpreter.allocate_tensors()  # allocate
-            input_details = interpreter.get_input_details()  # inputs
-            output_details = interpreter.get_output_details()  # outputs
-            # load metadata
-            with contextlib.suppress(zipfile.BadZipFile):
-                with zipfile.ZipFile(w, "r") as model:
-                    meta_file = model.namelist()[0]
-                    meta = ast.literal_eval(model.read(meta_file).decode("utf-8"))
-                    stride, names = int(meta["stride"]), meta["names"]
-        elif tfjs:  # TF.js
-            raise NotImplementedError("ERROR: YOLOv5 TF.js inference is not supported")
-        elif paddle:  # PaddlePaddle
-            LOGGER.info(f"Loading {w} for PaddlePaddle inference...")
-            check_requirements("paddlepaddle-gpu" if cuda else "paddlepaddle")
-            import paddle.inference as pdi
+        #         Interpreter, load_delegate = (
+        #             tf.lite.Interpreter,
+        #             tf.lite.experimental.load_delegate,
+        #         )
+        #     if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
+        #         LOGGER.info(f"Loading {w} for TensorFlow Lite Edge TPU inference...")
+        #         delegate = {"Linux": "libedgetpu.so.1", "Darwin": "libedgetpu.1.dylib", "Windows": "edgetpu.dll"}[
+        #             platform.system()
+        #         ]
+        #         interpreter = Interpreter(model_path=w, experimental_delegates=[load_delegate(delegate)])
+        #     else:  # TFLite
+        #         LOGGER.info(f"Loading {w} for TensorFlow Lite inference...")
+        #         interpreter = Interpreter(model_path=w)  # load TFLite model
+        #     interpreter.allocate_tensors()  # allocate
+        #     input_details = interpreter.get_input_details()  # inputs
+        #     output_details = interpreter.get_output_details()  # outputs
+        #     # load metadata
+        #     with contextlib.suppress(zipfile.BadZipFile):
+        #         with zipfile.ZipFile(w, "r") as model:
+        #             meta_file = model.namelist()[0]
+        #             meta = ast.literal_eval(model.read(meta_file).decode("utf-8"))
+        #             stride, names = int(meta["stride"]), meta["names"]
+        # elif tfjs:  # TF.js
+        #     raise NotImplementedError("ERROR: YOLOv5 TF.js inference is not supported")
+        # elif paddle:  # PaddlePaddle
+        #     LOGGER.info(f"Loading {w} for PaddlePaddle inference...")
+        #     check_requirements("paddlepaddle-gpu" if cuda else "paddlepaddle")
+        #     import paddle.inference as pdi
 
-            if not Path(w).is_file():  # if not *.pdmodel
-                w = next(Path(w).rglob("*.pdmodel"))  # get *.pdmodel file from *_paddle_model dir
-            weights = Path(w).with_suffix(".pdiparams")
-            config = pdi.Config(str(w), str(weights))
-            if cuda:
-                config.enable_use_gpu(memory_pool_init_size_mb=2048, device_id=0)
-            predictor = pdi.create_predictor(config)
-            input_handle = predictor.get_input_handle(predictor.get_input_names()[0])
-            output_names = predictor.get_output_names()
-        elif triton:  # NVIDIA Triton Inference Server
-            LOGGER.info(f"Using {w} as Triton Inference Server...")
-            check_requirements("tritonclient[all]")
-            from utils.triton import TritonRemoteModel
+        #     if not Path(w).is_file():  # if not *.pdmodel
+        #         w = next(Path(w).rglob("*.pdmodel"))  # get *.pdmodel file from *_paddle_model dir
+        #     weights = Path(w).with_suffix(".pdiparams")
+        #     config = pdi.Config(str(w), str(weights))
+        #     if cuda:
+        #         config.enable_use_gpu(memory_pool_init_size_mb=2048, device_id=0)
+        #     predictor = pdi.create_predictor(config)
+        #     input_handle = predictor.get_input_handle(predictor.get_input_names()[0])
+        #     output_names = predictor.get_output_names()
+        # elif triton:  # NVIDIA Triton Inference Server
+        #     LOGGER.info(f"Using {w} as Triton Inference Server...")
+        #     check_requirements("tritonclient[all]")
+        #     from utils.triton import TritonRemoteModel
 
-            model = TritonRemoteModel(url=w)
-            nhwc = model.runtime.startswith("tensorflow")
+        #     model = TritonRemoteModel(url=w)
+        #     nhwc = model.runtime.startswith("tensorflow")
         else:
             raise NotImplementedError(f"ERROR: {w} is not a supported format")
 
@@ -686,18 +686,9 @@ class DetectMultiBackend(nn.Module):
 
         if self.pt:  # PyTorch
             y = self.model(im, augment=augment, visualize=visualize) if augment or visualize else self.model(im)
-        elif self.jit:  # TorchScript
-            y = self.model(im)
-        elif self.dnn:  # ONNX OpenCV DNN
-            im = im.cpu().numpy()  # torch to numpy
-            self.net.setInput(im)
-            y = self.net.forward()
         elif self.onnx:  # ONNX Runtime
             im = im.cpu().numpy()  # torch to numpy
             y = self.session.run(self.output_names, {self.session.get_inputs()[0].name: im})
-        elif self.xml:  # OpenVINO
-            im = im.cpu().numpy()  # FP32
-            y = list(self.ov_compiled_model(im).values())
         elif self.engine:  # TensorRT
             if self.dynamic and im.shape != self.bindings["images"].shape:
                 i = self.model.get_binding_index("images")
@@ -711,49 +702,6 @@ class DetectMultiBackend(nn.Module):
             self.binding_addrs["images"] = int(im.data_ptr())
             self.context.execute_v2(list(self.binding_addrs.values()))
             y = [self.bindings[x].data for x in sorted(self.output_names)]
-        elif self.coreml:  # CoreML
-            im = im.cpu().numpy()
-            im = Image.fromarray((im[0] * 255).astype("uint8"))
-            # im = im.resize((192, 320), Image.BILINEAR)
-            y = self.model.predict({"image": im})  # coordinates are xywh normalized
-            if "confidence" in y:
-                box = xywh2xyxy(y["coordinates"] * [[w, h, w, h]])  # xyxy pixels
-                conf, cls = y["confidence"].max(1), y["confidence"].argmax(1).astype(np.float)
-                y = np.concatenate((box, conf.reshape(-1, 1), cls.reshape(-1, 1)), 1)
-            else:
-                y = list(reversed(y.values()))  # reversed for segmentation models (pred, proto)
-        elif self.paddle:  # PaddlePaddle
-            im = im.cpu().numpy().astype(np.float32)
-            self.input_handle.copy_from_cpu(im)
-            self.predictor.run()
-            y = [self.predictor.get_output_handle(x).copy_to_cpu() for x in self.output_names]
-        elif self.triton:  # NVIDIA Triton Inference Server
-            y = self.model(im)
-        else:  # TensorFlow (SavedModel, GraphDef, Lite, Edge TPU)
-            im = im.cpu().numpy()
-            if self.saved_model:  # SavedModel
-                y = self.model(im, training=False) if self.keras else self.model(im)
-            elif self.pb:  # GraphDef
-                y = self.frozen_func(x=self.tf.constant(im))
-            else:  # Lite or Edge TPU
-                input = self.input_details[0]
-                int8 = input["dtype"] == np.uint8  # is TFLite quantized uint8 model
-                if int8:
-                    scale, zero_point = input["quantization"]
-                    im = (im / scale + zero_point).astype(np.uint8)  # de-scale
-                self.interpreter.set_tensor(input["index"], im)
-                self.interpreter.invoke()
-                y = []
-                for output in self.output_details:
-                    x = self.interpreter.get_tensor(output["index"])
-                    if int8:
-                        scale, zero_point = output["quantization"]
-                        x = (x.astype(np.float32) - zero_point) * scale  # re-scale
-                    y.append(x)
-            if len(y) == 2 and len(y[1].shape) != 4:
-                y = list(reversed(y))
-            y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
-            y[0][..., :4] *= [w, h, w, h]  # xywh normalized to pixels
 
         if isinstance(y, (list, tuple)):
             return self.from_numpy(y[0]) if len(y) == 1 else [self.from_numpy(x) for x in y]

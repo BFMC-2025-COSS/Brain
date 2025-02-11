@@ -6,7 +6,7 @@ class Window(object):
     Represents a scanning window used to detect points likely to represent lane edge lines.
     """
 
-    def __init__(self, y1, y2, x, m=100, tolerance=900):
+    def __init__(self, y1, y2, x, m=40, tolerance=100):
         """
         Initializes a window object.
 

@@ -81,8 +81,8 @@ TrafficCommunication = False
 SerialHandler = False
 
 # ------ New component flags starts here ------#
-YOLO = True
-Lanekeep = False
+YOLO = False
+Lanekeep = True
 
 # ------ New component flags ends here ------#
 

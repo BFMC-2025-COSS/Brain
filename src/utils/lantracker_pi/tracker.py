@@ -16,7 +16,7 @@ class LaneTracker(object):
     Tracks the lane in a series of consecutive frames.
     """
 
-    def __init__(self, first_frame, n_windows=9):
+    def __init__(self, first_frame, mask, n_windows=15):
         """
         Initializes a tracker object.
 
@@ -31,9 +31,9 @@ class LaneTracker(object):
         self.right = None
         self.l_windows = []
         self.r_windows = []
-        self.initialize_lines(first_frame)
+        self.initialize_lines(mask)
 
-    def initialize_lines(self, frame):
+    def initialize_lines(self, flat_edges):
         """
         Finds starting points for left and right lines (e.g. lane edges) and initialises Window and Line objects.
 
@@ -42,8 +42,8 @@ class LaneTracker(object):
         frame   : Frame to scan for lane edges.
         """
         # Take a histogram of the bottom half of the image
-        edges = optimized_get_edges(frame)
-        (flat_edges, _) = flatten_perspective(edges)
+        # edges = optimized_get_edges(frame)
+        # (flat_edges, _) = flatten_perspective(edges)
 
         histogram = np.sum(flat_edges[int(self.h / 2):, :], axis=0)
 
@@ -57,11 +57,13 @@ class LaneTracker(object):
             l_window = Window(
                 y1=self.h - (i + 1) * window_height,
                 y2=self.h - i * window_height,
+                m = 40 if len(self.l_windows) > 0 else 80,
                 x=self.l_windows[-1].x if len(self.l_windows) > 0 else np.argmax(histogram[:self.w // 2])
             )
             r_window = Window(
                 y1=self.h - (i + 1) * window_height,
                 y2=self.h - i * window_height,
+                m = 40 if len(self.l_windows) > 0 else 80,
                 x=self.r_windows[-1].x if len(self.r_windows) > 0 else np.argmax(histogram[self.w // 2:]) + self.w // 2
             )
             # Append nonzero indices in the window boundary to the lists
@@ -128,7 +130,7 @@ class LaneTracker(object):
                 missing_window.x = reference_window.x + lane_width
 
 
-    def process(self, frame, draw_lane=True, draw_statistics=True):
+    def process(self, frame, flat_edges, unwarp_matrix, draw_lane=True, draw_statistics=True):
         """
         Performs a full lane tracking pipeline on a frame.
 
@@ -142,9 +144,6 @@ class LaneTracker(object):
         -------
         Resulting frame.
         """
-        edges = optimized_get_edges(frame)
-        (flat_edges, unwarp_matrix) = flatten_perspective(edges)
-
 
         (l_x, l_y) = self.scan_frame_with_windows(flat_edges, self.l_windows)
         # self.left.process_points(l_x, l_y)
@@ -172,20 +171,20 @@ class LaneTracker(object):
             self.left.process_points(l_x, l_y)
             self.right.process_points(r_x, r_y)
 
-        offset, curvature = self.calculate_metrics(frame.shape)
+        offset, curvature = self.calculate_metrics(flat_edges.shape)
         
         if draw_statistics:
             debug_overlay = self.draw_debug_overlay(flat_edges)
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
 
-            top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
-            lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
-            frame_center = top_overlay.shape[1] // 2
-            cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
-            cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
-            cv2.imshow("Top", top_overlay)
-            key = cv2.waitKey(1)
+            # top_overlay = self.draw_lane_overlay(flat_edges)
+            # lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
+            # frame_center = top_overlay.shape[1] // 2
+            # cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
+            # cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
+            # cv2.imshow("Top", top_overlay)
+            # key = cv2.waitKey(1)
 
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)

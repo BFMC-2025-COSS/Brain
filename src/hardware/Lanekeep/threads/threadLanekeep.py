@@ -10,6 +10,7 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.allMessages import LaneKeeping, LaneSpeed
 from src.utils.lantracker_pi.tracker import LaneTracker
+from src.utils.lantracker_pi.perspective import flatten_perspective
 from src.hardware.Lanekeep.threads.utils import OptimizedLaneNet
 #from picamera2 import Picamera2
 import torch
@@ -83,9 +84,21 @@ class threadLanekeep(ThreadWithStop):
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     def run(self):
-        #lane_track = LaneTracker(np.asanyarray(frame.get_data()))
+        frame = self._get_frame()
 
-        use_camera = True
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        input_image = torch.tensor(frame / 255.0, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(device)
+        start = time.time()
+        with torch.no_grad():
+            output = self.model(input_image)
+            output = output.squeeze().cpu().numpy()
+        print("lane: ",time.time() - start)
+        mask = (output > 0.2).astype(np.uint8) * 255
+        BEV_mask, unwrap_matrix= flatten_perspective(mask)
+        
+        lane_track = LaneTracker(np.asanyarray(frame),BEV_mask)
+
+        #use_camera = True
 
         while self._running:
             try:
@@ -101,6 +114,18 @@ class threadLanekeep(ThreadWithStop):
                     output = output.squeeze().cpu().numpy()
                 print("lane: ",time.time() - start)
                 mask = (output > 0.2).astype(np.uint8) * 255
+                BEV_frame = flatten_perspective(frame)
+                BEV_mask, unwrap_matrix = flatten_perspective(mask)
+
+                # save one frame
+                # cv2.imwrite("/home/seame/frame.jpg", frame)
+                
+                # frame = np.asanyarray(frame.get_data())
+                processed_frame, offset, curvature = lane_track.process(frame, BEV_mask, unwrap_matrix, True, True)
+
+                cv2.imshow("Processed frame", processed_frame)
+                cv2.imshow("BEV_frame", BEV_frame[0])
+                cv2.imshow("BEV_mask", BEV_mask)
                 cv2.imshow("frame", frame)
                 cv2.imshow("mask", mask)
                 if cv2.waitKey(10) & 0xFF == ord('q'):

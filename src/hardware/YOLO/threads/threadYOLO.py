@@ -9,6 +9,7 @@ import numpy as np
 import time
 from models.yolo import Model
 from models.common import DetectMultiBackend
+from utils.general import check_img_size, non_max_suppression
 
 from src.utils.lantracker_pi.tracker import LaneTracker
 from src.hardware.Lanekeep.threads.utils import OptimizedLaneNet
@@ -29,8 +30,13 @@ class threadYOLO(ThreadWithStop):
         self.fps = fps
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.weights = "/home/seame/Brain/pt/best.pt"
         self.model_yolo = self._load_yolo_model()
         self.model_lanekeep = self._load_lanekeep_model()
+        
+        
+        
+        
 
         self.pipeline = self._init_camera()
         self.AEBSender = messageHandlerSender(self.queuesList, AEB)
@@ -55,12 +61,17 @@ class threadYOLO(ThreadWithStop):
 
     def _load_yolo_model(self):
         """YOLO Model Load"""
+        print("start")
         start = time.time()
-        model_path = "/home/seame/Brain/pt/640_ped+human.pt"
-        model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, device=self.device)
+        model = DetectMultiBackend(self.weights, device=self.device)
+        self.stride, self.names, self.pt = model.stride, model.names, model.pt
+
+        self.imgsz = check_img_size(self.imgsz, s=self.stride)
+        if isinstance(self.imgsz, int): self.imgsz = (self.imgsz, self.imgsz)
+
         model.to(self.device).eval()
-        model.conf = 0.25
-        model.iou = 0.45
+        model.warmup(imgsz = (1,3,*self.imgsz))
+
         end = time.time()
         print(f"YOLO Model Load Time: {end-start:.2f}s")
         return model
@@ -102,12 +113,24 @@ class threadYOLO(ThreadWithStop):
                 if frame is None:
                     continue
                 start = time.time()
-                results = self.model_yolo(frame, size=self.imgsz)
-                detections = results.xyxy[0]
+                frame = cv2.resize(frame,self.imgsz, interpolation = cv2.INTER_LINEAR)
+
+                im = torch.from_numpy(frame).to(self.device)
+                im = im.permute(2, 0, 1).unsqueeze(0)  # HWC → CHW, Batch 차원 추가
+                im = im.half() if self.model_yolo.fp16 else im.float()  # uint8 → FP16/FP32 변환
+                im /= 255.0  # Normalize to [0,1]
+                if len(im.shape) == 3:
+                    im = im[None]  # Batch 차원 추가
+
+                with torch.no_grad():
+                    pred = self.model_yolo(im)  # YOLO 모델 추론
+                detections = non_max_suppression(pred, self.threshold_conf, 0.45, classes=None, agnostic=False)
+
                 annotated_frame = frame.copy()
 
                 detected = False
                 for det in detections:
+                    det = det.squeeze(0)
                     x1, y1, x2, y2, conf, cls = det
                     area = (x2 - x1) * (y2 - y1)
                     cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
