@@ -6,7 +6,7 @@ class Window(object):
     Represents a scanning window used to detect points likely to represent lane edge lines.
     """
 
-    def __init__(self, y1, y2, x, m=40, tolerance=100):
+    def __init__(self, y1, y2, x, m=40, tolerance=50):
         """
         Initializes a window object.
 
@@ -52,7 +52,9 @@ class Window(object):
         ).nonzero()[0]
         #print(len(win_indices))
         if len(win_indices) > self.tolerance:
-            self.mean_x = np.int32(np.mean(nonzero[1][win_indices]))
+            new_x = np.int32(np.mean(nonzero[1][win_indices]))
+            self.x = new_x
+            self.mean_x = new_x
         else:
             self.mean_x = self.x
 

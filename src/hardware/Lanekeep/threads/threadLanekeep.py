@@ -46,6 +46,7 @@ class threadLanekeep(ThreadWithStop):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         model.eval()
+        
         end = time.time()
         print(f"Model Load Time: {end-start:.2f}s")
         return model
@@ -118,7 +119,7 @@ class threadLanekeep(ThreadWithStop):
                 BEV_mask, unwrap_matrix = flatten_perspective(mask)
 
                 # save one frame
-                # cv2.imwrite("/home/seame/frame.jpg", frame)
+                # cv2.imwrite("/home/seame/mask1.jpg", BEV_mask)
                 
                 # frame = np.asanyarray(frame.get_data())
                 processed_frame, offset, curvature = lane_track.process(frame, BEV_mask, unwrap_matrix, True, True)
