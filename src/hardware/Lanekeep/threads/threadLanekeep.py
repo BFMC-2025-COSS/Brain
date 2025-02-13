@@ -52,12 +52,12 @@ class threadLanekeep(ThreadWithStop):
         return model
 
      #Linear Mapping function
-    def map_linear(self,offset, max_offset= 17.5, max_angle=200):
+    def map_linear(self,offset, max_offset= 15, max_angle=200):
          steering = (offset/max_offset) * max_angle *(-1)
          return np.clip(steering, -max_angle, max_angle)
 
     # nonLinear Mapping function
-    def map_nonlinear(self, offset, max_angle=200, alpha=5.0):
+    def map_nonlinear(self, offset, max_angle=250, alpha=5.0):
         steering_angle = np.tanh(alpha * offset) * max_angle *(-1)
         return steering_angle
 
@@ -113,7 +113,7 @@ class threadLanekeep(ThreadWithStop):
                 with torch.no_grad():
                     output = self.model(input_image)
                     output = output.squeeze().cpu().numpy()
-                print("lane: ",time.time() - start)
+                #print("lane: ",time.time() - start)
                 mask = (output > 0.2).astype(np.uint8) * 255
                 BEV_frame = flatten_perspective(frame)
                 BEV_mask, unwrap_matrix = flatten_perspective(mask)
@@ -124,11 +124,11 @@ class threadLanekeep(ThreadWithStop):
                 # frame = np.asanyarray(frame.get_data())
                 processed_frame, offset, curvature = lane_track.process(frame, BEV_mask, unwrap_matrix, True, True)
 
-                cv2.imshow("Processed frame", processed_frame)
-                cv2.imshow("BEV_frame", BEV_frame[0])
-                cv2.imshow("BEV_mask", BEV_mask)
-                cv2.imshow("frame", frame)
-                cv2.imshow("mask", mask)
+                #cv2.imshow("Processed frame", processed_frame)
+                #cv2.imshow("BEV_frame", BEV_frame[0])
+                #cv2.imshow("BEV_mask", BEV_mask)
+                #cv2.imshow("frame", frame)
+                # cv2.imshow("mask", mask)
                 if cv2.waitKey(10) & 0xFF == ord('q'):
                     break
                 # frame = np.asanyarray(frame.get_data())
@@ -140,12 +140,12 @@ class threadLanekeep(ThreadWithStop):
 
                 # frame = np.asanyarray(frame.get_data())
                 # processed_frame, offset, curvature = lane_track.process(frame, True, True)
-                # steering_angle = self.calculate_steering_angle(offset, curvature)
-                # speed = self.calculate_speed(steering_angle)
+                steering_angle = self.calculate_steering_angle(offset, curvature)
+                speed = self.calculate_speed(steering_angle)
 
-                # print("angle:", steering_angle, "speed:", speed)
-                # self.lanekeepingSender.send(float(steering_angle))
-                # self.lanespeedSender.send(float(speed))
+                print("angle:", steering_angle, "speed:", speed)
+                self.lanekeepingSender.send(float(steering_angle))
+                self.lanespeedSender.send(float(speed))
                 # print(time.time() - start)
 
             except Exception as e:

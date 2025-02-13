@@ -99,9 +99,7 @@ class LaneTracker(object):
         r_median_xs = np.array([pt[0] for pt in r_median_centers])
         r_median_ys = np.array([pt[1] for pt in r_median_centers])
 
-        print("Left Line")
         self.left = Line(x=l_median_xs, y=l_median_ys, h=self.h, w=self.w)
-        print("Right Line")
         self.right = Line(x=r_median_xs, y=r_median_ys, h=self.h, w=self.w)
 
         # for i in range(self.win_n):
@@ -201,8 +199,8 @@ class LaneTracker(object):
 
 
         # print("l: ",len(l_x),"r: ", len(r_x))
-        left_visible = len(l_x) > 3500
-        right_visible = len(r_x) > 3500
+        left_visible = len(l_x) > 4000
+        right_visible = len(r_x) > 4000
 
         if not left_visible and right_visible:
             self.update_missing_windows(self.l_windows, self.r_windows, direction="left", lane_width=300)
@@ -228,13 +226,13 @@ class LaneTracker(object):
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
 
-            # top_overlay = self.draw_lane_overlay(flat_edges)
-            # lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
-            # frame_center = top_overlay.shape[1] // 2
-            # cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
-            # cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
-            # cv2.imshow("Top", top_overlay)
-            # key = cv2.waitKey(1)
+            top_overlay = self.draw_lane_overlay(frame)
+            lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
+            frame_center = top_overlay.shape[1] // 2
+            cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
+            cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
+            cv2.imshow("Top", top_overlay)
+            key = cv2.waitKey(1)
 
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
@@ -258,7 +256,7 @@ class LaneTracker(object):
         #lane_center = (np.average(self.left.get_points()[:, 0], weights=weights) + np.average(self.right.get_points()[:, 0], weights=weights)) / 2
         
         frame_center = frame_shape[1] // 2
-        offset = (frame_center - lane_center) * 35 / 352  # Convert to cm in BFMC Format(35cm, 960x540=352pixels)
+        offset = (frame_center - lane_center) * 35 / 310  # Convert to cm in BFMC Format(35cm, 960x540=352pixels, 270x480=310pixels )
         return offset, curvature
 
 
