@@ -63,6 +63,7 @@ class LaneTracker(object):
                 m = 40 if len(self.l_windows) > 0 else 70,
                 x=self.l_windows[-1].x if len(self.l_windows) > 0 else np.argmax(histogram[:self.w // 2])
             )
+            
             r_window = Window(
                 y1=self.h - (i + 1) * window_height,
                 y2=self.h - i * window_height,
@@ -139,45 +140,20 @@ class LaneTracker(object):
         indices = np.empty([0], dtype=np.int32)
         nonzero = frame.nonzero()
         window_x = None
-        for window in windows:
-            indices = np.append(indices, window.pixels_in(nonzero, window_x), axis=0)
+        no_pixel_count = 0
+        for i, window in enumerate(windows):
+            win_indices = window.pixels_in(nonzero, window_x)
+            if len(win_indices) < 20:
+                no_pixel_count += 1
+            else:
+                no_pixel_count = 0
+            
+            if no_pixel_count >=2:
+                #print("no pixel detected")
+                break
+            indices = np.append(indices, win_indices, axis=0)
             window_x = window.mean_x
         return (nonzero[1][indices], nonzero[0][indices])
-
-    def predict_missing_lane(self, visible_lane, lane_width, direction="right"):
-        """
-        Predicts the missing lane using the visible lane and the lane width.
-
-        Parameters
-        ----------
-        visible_lane : Line
-            The visible lane (left or right).
-        lane_width : int
-            The distance (in pixels) between the two lanes.
-        direction : str
-            "left" or "right", indicating which lane is missing.
-
-        Returns
-        -------
-        np.ndarray
-            Predicted points for the missing lane.
-        """
-        visible_points = visible_lane.get_points()  
-        if direction == "right":
-            predicted_points = visible_points.copy()
-            predicted_points[:, 0] += lane_width  
-        elif direction == "left":
-            predicted_points = visible_points.copy()
-            predicted_points[:, 0] -= lane_width  
-        return predicted_points
-
-    def update_missing_windows(self, missing_windows, reference_windows, direction, lane_width=300):
-        for missing_window, reference_window in zip(missing_windows, reference_windows):
-            if direction == "left":
-                missing_window.x = reference_window.x - lane_width
-            elif direction == "right":
-                missing_window.x = reference_window.x + lane_width
-
 
     def process(self, frame, flat_edges, unwarp_matrix, draw_lane=True, draw_statistics=True):
         """
@@ -198,11 +174,12 @@ class LaneTracker(object):
         (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
 
 
-        # print("l: ",len(l_x),"r: ", len(r_x))
-        left_visible = len(l_x) > 4000
-        right_visible = len(r_x) > 4000
+        #print("l: ",len(l_x),"r: ", len(r_x))
+        left_visible = len(l_x) > 2500
+        right_visible = len(r_x) > 2500
 
         if not left_visible and right_visible:
+            print("left not visible")
             self.update_missing_windows(self.l_windows, self.r_windows, direction="left", lane_width=300)
 
             predicted_left_points = self.predict_missing_lane(self.right, lane_width=300, direction="left")
@@ -210,13 +187,26 @@ class LaneTracker(object):
             self.right.process_points(r_x, r_y)
 
         elif not right_visible and left_visible:
+            print("right not visible")
             self.update_missing_windows(self.r_windows, self.l_windows, direction="right", lane_width=300)
 
             predicted_right_points = self.predict_missing_lane(self.left, lane_width=300, direction="right")
             self.right.process_points(predicted_right_points[:, 0], predicted_right_points[:, 1])
             self.left.process_points(l_x, l_y)
 
-        else:
+        # If both lanes are not visible, we process all points
+        if not left_visible and not right_visible:
+            if self.left and self.right:
+                print("both not visible use previous data")
+                l_x, l_y = self.left.get_points()[:, 0], self.left.get_points()[:, 1]
+                r_x, r_y = self.right.get_points()[:, 0], self.right.get_points()[:, 1]
+                self.left.process_points(l_x, l_y)
+                self.right.process_points(r_x, r_y)
+            else:
+                print("no previous data")
+
+        # If both lanes are visible, we process all points
+        if left_visible and right_visible:
             self.left.process_points(l_x, l_y)
             self.right.process_points(r_x, r_y)
 
@@ -226,18 +216,39 @@ class LaneTracker(object):
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
 
-            top_overlay = self.draw_lane_overlay(frame)
-            lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
-            frame_center = top_overlay.shape[1] // 2
-            cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
-            cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
-            cv2.imshow("Top", top_overlay)
-            key = cv2.waitKey(1)
+            #top_overlay = self.draw_lane_overlay(frame)
+            #lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
+            #frame_center = top_overlay.shape[1] // 2
+            #cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
+            #cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
+            #cv2.imshow("Top", top_overlay)
+            #key = cv2.waitKey(1)
 
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
 
         return frame, offset, curvature
+
+
+    def predict_missing_lane(self, visible_lane, lane_width, direction="right"):
+        visible_points = visible_lane.get_points()  
+        if direction == "right":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] += lane_width  
+        elif direction == "left":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] -= lane_width  
+        return predicted_points
+
+    def update_missing_windows(self, missing_windows, reference_windows, direction, lane_width=300):
+        for missing_window, reference_window in zip(missing_windows, reference_windows):
+            if direction == "left":
+                missing_window.x = reference_window.x - lane_width
+            elif direction == "right":
+                missing_window.x = reference_window.x + lane_width
+    
+            
+
 
     
     def calculate_metrics(self, frame_shape):
@@ -293,6 +304,15 @@ class LaneTracker(object):
         if lines:
             cv2.polylines(image, [self.left.get_points()], False, (1., 0, 0), 2)
             cv2.polylines(image, [self.right.get_points()], False, (1., 0, 0), 2)
+
+        height, width, _ = image.shape
+
+        center_x = width // 2
+        cv2.line(image, (center_x, 0), (center_x, height), (0, 1., 0), 2)
+
+        lane_center_x = int((np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2)
+        cv2.circle(image, (lane_center_x, height // 2), 5, (0, 0, 1.), -1)
+
         return image * 255
 
     def draw_lane_overlay(self, image, unwarp_matrix=None):
