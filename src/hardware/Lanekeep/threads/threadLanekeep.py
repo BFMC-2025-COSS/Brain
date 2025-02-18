@@ -52,7 +52,7 @@ class threadLanekeep(ThreadWithStop):
         return model
 
      #Linear Mapping function
-    def map_linear(self,offset, max_offset= 15, max_angle=200):
+    def map_linear(self,offset, max_offset= 15, max_angle=250):
          steering = (offset/max_offset) * max_angle *(-1)
          return np.clip(steering, -max_angle, max_angle)
 
@@ -100,7 +100,7 @@ class threadLanekeep(ThreadWithStop):
         lane_track = LaneTracker(np.asanyarray(frame),BEV_mask)
 
         #use_camera = True
-
+        count = 0
         while self._running:
             try:
                 frame = self._get_frame()
@@ -119,7 +119,9 @@ class threadLanekeep(ThreadWithStop):
                 BEV_mask, unwrap_matrix = flatten_perspective(mask)
 
                 # save one frame
-                # cv2.imwrite("/home/seame/mask1.jpg", BEV_mask)
+                cv2.imwrite(f"/home/seame/LaneNet_dataset/mask{count}.jpg", frame)
+                count+=1
+                #cv2.imwrite(f"/home/seame/LaneNet_dataset/mask{count}.jpg", frame)
                 
                 # frame = np.asanyarray(frame.get_data())
                 processed_frame, offset, curvature = lane_track.process(frame, BEV_mask, unwrap_matrix, True, True)
@@ -179,7 +181,15 @@ class threadLanekeep(ThreadWithStop):
         """
         #print("here")
         #return self.map_f(offset,-0.254,0.1725,-100,100)
-        return self.map_linear(offset)
+        offest_angle =  self.map_linear(offset)
+        if curvature != 0:
+            curvature_factor = 1/curvature
+        else:
+            curvature_factor = 0
+        curvature_factor = 0
+        steering_angle = offest_angle + (curvature_factor*20)
+        #print("offset: ", offset, "curvature: ", curvature, "steering_angle: ", steering_angle)
+        return np.clip(steering_angle, -250, 250)
         #return self.map_curvature(offset,curvature)
 
     def calculate_speed(self, steering_angle, max_speed=300, min_speed=100):

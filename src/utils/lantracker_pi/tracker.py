@@ -148,7 +148,7 @@ class LaneTracker(object):
             else:
                 no_pixel_count = 0
             
-            if no_pixel_count >=2:
+            if no_pixel_count >=4:
                 #print("no pixel detected")
                 break
             indices = np.append(indices, win_indices, axis=0)
@@ -174,9 +174,9 @@ class LaneTracker(object):
         (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
 
 
-        #print("l: ",len(l_x),"r: ", len(r_x))
-        left_visible = len(l_x) > 2500
-        right_visible = len(r_x) > 2500
+       # print("l: ",len(l_x),"r: ", len(r_x))
+        left_visible = len(l_x) > 2000
+        right_visible = len(r_x) > 2000
 
         if not left_visible and right_visible:
             print("left not visible")
@@ -198,10 +198,10 @@ class LaneTracker(object):
         if not left_visible and not right_visible:
             if self.left and self.right:
                 print("both not visible use previous data")
-                l_x, l_y = self.left.get_points()[:, 0], self.left.get_points()[:, 1]
-                r_x, r_y = self.right.get_points()[:, 0], self.right.get_points()[:, 1]
-                self.left.process_points(l_x, l_y)
-                self.right.process_points(r_x, r_y)
+                #l_x, l_y = self.left.get_points()[:, 0], self.left.get_points()[:, 1]
+                #r_x, r_y = self.right.get_points()[:, 0], self.right.get_points()[:, 1]
+                #self.left.process_points(l_x, l_y)
+                #self.right.process_points(r_x, r_y)
             else:
                 print("no previous data")
 
@@ -260,8 +260,15 @@ class LaneTracker(object):
         #lane_center = (self.left.get_points()[0][0] + self.right.get_points()[0][0]) / 2
         
         # Using all window's x pixels
-        lane_center = (np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2
-        
+        left_points = self.left.get_points()
+        right_points = self.right.get_points()
+
+        min_length = min(len(left_points), len(right_points))
+        left_x = left_points[:min_length, 0]
+        right_x = right_points[:min_length, 0]
+
+
+        lane_center = (np.mean(left_x) + np.mean(right_x)) / 2    
         # Using weights average(more weights on near lane)
         #weights = np.linspace(1, 0, len(self.left.get_points()))
         #lane_center = (np.average(self.left.get_points()[:, 0], weights=weights) + np.average(self.right.get_points()[:, 0], weights=weights)) / 2
@@ -310,8 +317,18 @@ class LaneTracker(object):
         center_x = width // 2
         cv2.line(image, (center_x, 0), (center_x, height), (0, 1., 0), 2)
 
-        lane_center_x = int((np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2)
-        cv2.circle(image, (lane_center_x, height // 2), 5, (0, 0, 1.), -1)
+
+        left_points = self.left.get_points()
+        right_points = self.right.get_points()
+
+        min_length = min(len(left_points), len(right_points))
+        left_x = left_points[:min_length, 0]
+        right_x = right_points[:min_length, 0]
+
+
+        lane_center_x = (np.mean(left_x) + np.mean(right_x)) / 2    
+        #lane_center_x = int((np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2)
+        cv2.circle(image, (int(lane_center_x), height // 2), 5, (0, 0, 1.), -1)
 
         return image * 255
 

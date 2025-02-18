@@ -196,7 +196,7 @@ class threadWrite(ThreadWithStop):
                             if laneRecv is not None:
                                 if self.debugger:
                                     self.logger.info(laneRecv)
-                                command = {"action": "steer", "steerAngle": int(laneRecv-30)}
+                                command = {"action": "steer", "steerAngle": int(laneRecv-10)}
                                 self.sendToSerial(command)
 
                             laneRecv_speed = self.lanespeedSubscriber.receive()

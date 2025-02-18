@@ -17,7 +17,9 @@ def flatten_perspective(image):
     (h, w) = (image.shape[0], image.shape[1])
     # Define source points
     # source = np.float32([[w // 2 - 80 , h * .25], [w // 2 + 80, h * .25], [w // 2 - 200, h * .85], [w // 2 + 200, h * .85]])
-    source = np.float32([[w // 2 - 45 , h * .3], [w // 2 + 45, h * .3], [w // 2 - 145, h * .85], [w // 2 + 145, h * .85]])
+    source = np.float32([[w // 2 - 75, h * .45], [w // 2 + 75, h * .45], [w // 2 - 145, h * .85], [w // 2 + 145, h * .85]])
+    ## 3rd report
+    # source = np.float32([[w // 2 - 45 , h * .3], [w // 2 + 45, h * .3], [w // 2 - 145, h * .85], [w // 2 + 145, h * .85]])
 
     #source = np.float32([[330-70 , 340], [670+70, 340], [0, 540], [960, 540]])
     # Define corresponding destination points
@@ -29,7 +31,9 @@ def flatten_perspective(image):
 # Test the function
 # img = "/home/seame/mask1.jpg"
 # frame = cv2.imread(img)
+# print("Ready for BEV")
 # flattened = flatten_perspective(frame)
-# cv2.imshow("flattened", frame)
+# print("BEV done")
+# cv2.imshow("flattened", flattened[0])
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
