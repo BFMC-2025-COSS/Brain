@@ -1,10 +1,10 @@
 import numpy as np
 import cv2
 from concurrent.futures import ThreadPoolExecutor
-from src.utils.lantracker_pi.window import Window
-from src.utils.lantracker_pi.line import Line
-from src.utils.lantracker_pi.gradients import get_edges, optimized_get_edges
-from src.utils.lantracker_pi.perspective import flatten_perspective
+from Brain.src.utils.lantracker_pi.window import Window
+from Brain.src.utils.lantracker_pi.line import Line
+from Brain.src.utils.lantracker_pi.gradients import get_edges, optimized_get_edges
+from Brain.src.utils.lantracker_pi.perspective import flatten_perspective
 import time
 # from window import Window
 # from line import Line
