@@ -70,7 +70,7 @@ class LaneKeeper(Process):
         self.serial_pub.publish(steer_str)
 
 
-        #cv2.imshow("Detected", frame)
+        #cv2.imshow("Detected", mask)
         #cv2.waitKey(1)
 
     def run(self):
