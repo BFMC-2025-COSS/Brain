@@ -8,7 +8,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Float32
 from geometry_msgs.msg import Quaternion
 import tf.transformations as transformations
-from bfmc.msg import realsense_imu
+from bfmc.msg import realsense_imu, bfmc_imu
 
 # 초기 위치 및 속도 변수
 # x_ = 11.77
@@ -50,25 +50,31 @@ def realsense_callback(msg):
     quaternion[3] = msg.orientation.w
 
 def bfmc_callback(msg):
-    global angular_velocity_, yaw_, prev_yaw_
+    global angular_velocity_,linear_velocity_, yaw_, prev_yaw_
     global quaternion
     global start_time, finish_time
 
-    yaw_ = -(msg.data / 31635) * 360  # get yaw data
+
+    yaw_ = -(msg.yaw / 31635) * 360  # get yaw data
     if yaw_ >180:
         yaw = yaw_-360
     else:
         yaw = yaw_
-    yaw_ = yaw_ * 3.141592 / 180
+    yaw_ = yaw_ * math.pi / 180
 
+    #accel_x = msg.accely
 
     start_time = rospy.Time.now()
     if finish_time is not None:
         dt = (start_time - finish_time).to_sec()
         delta_yaw = yaw_ - prev_yaw_
         angular_velocity_ = delta_yaw / dt # get angular_velocity data
+        #linear_velocity_ = accel_x * dt # get linear_velocity data
     else:
         angular_velocity_ = 0.0
+        #linear_velocity_ = 0.0
+
+    
     finish_time = start_time
     prev_yaw_ = yaw_
 
@@ -138,10 +144,10 @@ def main():
     # 퍼블리셔 및 서브스크라이버 설정
     odom_pub_ = rospy.Publisher('/odom', Odometry, queue_size=10)
     #rospy.Subscriber('/realsense_imu', realsense_imu, realsense_callback)
-    rospy.Subscriber('/BFMC_yaw', Float64, bfmc_callback)
+    rospy.Subscriber('/BFMC_imu', bfmc_imu, bfmc_callback)
 
-    #rospy.Subscriber('/sensor/speed', Float32, speed_callback)
-    rospy.Subscriber('/speed', Float32, speed_callback)
+    rospy.Subscriber('/sensor/speed', Float32, speed_callback)
+    # rospy.Subscriber('/speed', Float32, speed_callback)
 
     current_time_ = rospy.Time.now()
     last_time_ = current_time_
