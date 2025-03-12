@@ -181,9 +181,8 @@ class threadRead(ThreadWithStop):
             os.system("sudo shutdown -h now")
         elif action == "speedSensor":
             speedSensor = value.split(",")[0]
-            print("speedSensor Value: ", speedSensor)
-
-
+            #print("speedSensor:", speedSensor)
+        
             
     def checkValidValue(self, action, message):
         if message == "syntax error":

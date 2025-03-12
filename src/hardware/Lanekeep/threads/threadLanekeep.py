@@ -33,7 +33,8 @@ class threadLanekeep(ThreadWithStop):
         self.cameraSubscriber = messageHandlerSubscriber(self.queuesList, mainCamera,"fifo",True)
         self.model = self._load_model()
         self.pipeline = self._init_camera()
-
+        self.priority = 0
+        self.threshold = 3000
     #def map_f(self,x,in_min,in_max,out_min,out_max):
     #    a= (x-in_min)*(out_max-out_min)*(-1) / (in_max-in_min)+out_min
     #    return a
@@ -84,6 +85,39 @@ class threadLanekeep(ThreadWithStop):
         frame = np.asanyarray(color_frame.get_data())
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+    def detect_stop_line(self, masked_image):
+        """Detect stop line"""
+        height, width = masked_image.shape
+        roi = masked_image[int(height * 0.85):, int(width * 0.3):int(width * 0.7)]
+        pixels = cv2.countNonZero(roi)
+        print(f"pixels: {pixels}")
+        if pixels > self.threshold:
+            self.turn_left()
+        else:
+            pass
+
+    def turn_left(self):
+        for i in range(3):
+            print("stop")
+            self.lanespeedSender.send(float(0))
+            time.sleep(0.5)
+        for i in range(30):
+            print("go")
+            try:
+                self.lanekeepingSender.send(float(-20))
+                self.lanespeedSender.send(float(100))
+            except:
+                print("ecvept")
+            time.sleep(0.1)
+        for i in range(40):
+            print("turn left", i)
+            self.lanekeepingSender.send(float(-180))
+            self.lanespeedSender.send(float(200))
+            time.sleep(0.1)
+            self.priority = 1
+            self.threshold = 4000
+        pass
+
     def run(self):
         frame = self._get_frame()
 
@@ -117,14 +151,14 @@ class threadLanekeep(ThreadWithStop):
                 mask = (output > 0.2).astype(np.uint8) * 255
                 BEV_frame = flatten_perspective(frame)
                 BEV_mask, unwrap_matrix = flatten_perspective(mask)
-
+                self.detect_stop_line(BEV_mask)
                 # save one frame
-                cv2.imwrite(f"/home/seame/LaneNet_dataset/mask{count}.jpg", frame)
-                count+=1
+                #cv2.imwrite(f"/home/seame/LaneNet_dataset/mask{count}.jpg", frame)
+                #count+=1
                 #cv2.imwrite(f"/home/seame/LaneNet_dataset/mask{count}.jpg", frame)
                 
                 # frame = np.asanyarray(frame.get_data())
-                processed_frame, offset, curvature = lane_track.process(frame, BEV_mask, unwrap_matrix, True, True)
+                processed_frame, offset, curvature = lane_track.process(frame, BEV_mask,self.priority, unwrap_matrix, True, True)
 
                 #cv2.imshow("Processed frame", processed_frame)
                 #cv2.imshow("BEV_frame", BEV_frame[0])
@@ -149,7 +183,7 @@ class threadLanekeep(ThreadWithStop):
                 self.lanekeepingSender.send(float(steering_angle))
                 self.lanespeedSender.send(float(speed))
                 # print(time.time() - start)
-
+                time.sleep(0.1)
             except Exception as e:
                 if self.debugging:
                     self.logging.error(f"Error in lane tracking: {e}")
@@ -164,22 +198,6 @@ class threadLanekeep(ThreadWithStop):
     
     def calculate_steering_angle(self, offset,curvature):
 
-        """
-        Calculates the steering angle based on lane offset and curvature.
-
-        Parameters
-        ----------
-        offset : float
-            The lateral offset of the vehicle from the lane center.
-        curvature : float
-            The curvature of the detected lane.
-
-        Returns
-        -------
-        steering_angle : float
-            The calculated steering angle for lane keeping.
-        """
-        #print("here")
         #return self.map_f(offset,-0.254,0.1725,-100,100)
         offest_angle =  self.map_linear(offset)
         if curvature != 0:
@@ -193,23 +211,7 @@ class threadLanekeep(ThreadWithStop):
         #return self.map_curvature(offset,curvature)
 
     def calculate_speed(self, steering_angle, max_speed=300, min_speed=100):
-        """
-        Calculates speed based on the steering angle.
 
-        Parameters
-        ----------
-        steering_angle : float
-            The current steering angle of the vehicle.
-        max_speed : int
-            The maximum speed of the vehicle (for straight roads).
-        min_speed : int
-            The minimum speed of the vehicle (for sharp turns).
-
-        Returns
-        -------
-        speed : int
-            Calculated speed based on the steering angle.
-        """
         angle_abs = abs(steering_angle)
 
         if angle_abs > 200:

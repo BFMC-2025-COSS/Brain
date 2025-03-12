@@ -3,4 +3,5 @@ docs/build/
 __pycache__
 **/*.pyc
 /src/dashboard/frontend/node_modules
-/pt/*
+/models/
+data.yaml
