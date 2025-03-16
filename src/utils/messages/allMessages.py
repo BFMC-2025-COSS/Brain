@@ -59,6 +59,12 @@ class LaneKeeping(Enum):
     msgID = 5
     msgType = "int"
 
+class grayCamera(Enum):
+    Queue = "General"
+    Owner = "threadCamera" # here you will send an offset of the car position between the lanes of the road + - from 0 point to dashboard
+    msgID = 6
+    msgType = "str"    
+
 ################################# processCarsAndSemaphores ##################################
 class Cars(Enum):
     Queue = "General"

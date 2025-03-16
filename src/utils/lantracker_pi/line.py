@@ -22,7 +22,7 @@ class Line(object):
         self.h = h
         self.w = w
         self.frame_impact = 0
-        self.coefficients = deque(maxlen=10)
+        self.coefficients = deque(maxlen=3)
         self.process_points(x, y)
 
     def process_points(self, x, y):
@@ -34,7 +34,7 @@ class Line(object):
         x   : Array of x coordinates for pixels representing a line.
         y   : Array of y coordinates for pixels representing a line.
         """
-        enough_points = len(y) > 0 and np.max(y) - np.min(y) > self.h * .625
+        enough_points = len(y) > 0 and np.max(y) - np.min(y) > self.h * .3
         if enough_points or len(self.coefficients) == 0:
             self.fit(x, y)
 
@@ -75,6 +75,7 @@ class Line(object):
         """
         self.coefficients.append(np.polyfit(y, x, 2))
 
+
     def radius_of_curvature(self):
         """
         Calculates radius of curvature of the line in real world coordinate system (e.g. meters), assuming there are
@@ -85,8 +86,8 @@ class Line(object):
         Estimated radius of curvature in meters.
         """
         # Define conversions in x and y from pixels space to meters
-        ym_per_pix = 27 / 720  # meters per pixel in y dimension
-        xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+        ym_per_pix = 74 / 540  # cm / pixels
+        xm_per_pix = 35 / 352  # cm / pixels
         # Fit new polynomials to x,y in world space
         points = self.get_points()
         y = points[:, 1]

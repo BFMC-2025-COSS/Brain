@@ -39,12 +39,14 @@ from src.utils.messages.allMessages import (
     SpeedMotor,
     Brake,
     AEB,
+    HighwaySignal,
     ToggleBatteryLvl,
     ToggleImuData,
     ToggleInstant,
     ToggleResourceMonitor,
     LaneKeeping,
-    LaneSpeed
+    LaneSpeed,
+    DrivingMode
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -88,6 +90,7 @@ class threadWrite(ThreadWithStop):
         
 
         self.lastspeed = 0 # For Finishing AEB System
+        self.highwayMode = False # For Highway Mode
 
     def subscribe(self):
         """Subscribe function. In this function we make all the required subscribe to process gateway"""
@@ -98,12 +101,15 @@ class threadWrite(ThreadWithStop):
         self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, SpeedMotor, "lastOnly", True)
         self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
         self.AEBSubscriber = messageHandlerSubscriber(self.queuesList, AEB, "lastOnly", True)
+        self.highway_signalSubscriber = messageHandlerSubscriber(self.queuesList, HighwaySignal, "lastOnly", True)
+
         self.instantSubscriber = messageHandlerSubscriber(self.queuesList, ToggleInstant, "lastOnly", True)
         self.batterySubscriber = messageHandlerSubscriber(self.queuesList, ToggleBatteryLvl, "lastOnly", True)
         self.resourceMonitorSubscriber = messageHandlerSubscriber(self.queuesList, ToggleResourceMonitor, "lastOnly", True)
         self.imuSubscriber = messageHandlerSubscriber(self.queuesList, ToggleImuData, "lastOnly", True)
         self.lanekeepingSubscriber = messageHandlerSubscriber(self.queuesList, LaneKeeping, "lastOnly", True)
         self.lanespeedSubscriber = messageHandlerSubscriber(self.queuesList, LaneSpeed, "lastOnly", True)
+        self.modeSubscriber = messageHandlerSubscriber(self.queuesList, DrivingMode, "lastOnly", True)
 
     # ==================================== SENDING =======================================
 
@@ -112,6 +118,8 @@ class threadWrite(ThreadWithStop):
         if command_msg != "error":
             self.serialCom.write(command_msg.encode("ascii"))
             self.logFile.write(command_msg)
+            #print("\t\t\t\t\t\tserial:", command_msg)
+
 
     def loadConfig(self, configType):
         with open(self.configPath, "r") as file:
@@ -144,6 +152,11 @@ class threadWrite(ThreadWithStop):
 
         while self._running:
             try:
+                drivingmode = self.modeSubscriber.receive()
+                if drivingmode is not None:
+                    currnetMode = drivingmode
+                    print(f"Driving Mode switched to: {currnetMode}")
+
                 klRecv = self.klSubscriber.receive()
                 if klRecv is not None:
                     if self.debugger:
@@ -168,76 +181,86 @@ class threadWrite(ThreadWithStop):
 
                 if self.running:
                     if self.engineEnabled:
-                    ########################### YOLO ###########################
-                      aeb_signal = self.AEBSubscriber.receive()
-                        if aeb_signal is not None:# YOLO
-                            if self.debugger:
-                                self.logger.info(f"AEB signal received: {aeb_signal}")
-                            if aeb_signal == 0.0:
-                                if self.lastspeed > 0:
-                                    command = {"action": "speed", "speed": self.lastspeed}
+                        if currnetMode == "auto":
+                            ########################### Highway ###########################
+                            highway_signal = self.highway_signalSubscriber.receive() # 1: highway, 0: non-highway
+                            if highway_signal is not None:
+                                if highway_signal == 1.0:
+                                    self.highwayMode = True
+                                    if self.debugger:
+                                        self.logger.info("Highway Mode activated")
+                                elif highway_signal == 0.0:
+                                    self.highwayMode = False
+                            
+                            ########################### YOLO ###########################
+                            aeb_signal = self.AEBSubscriber.receive()
+                            if aeb_signal is not None:
+                                if self.debugger:
+                                    self.logger.info(f"AEB signal received: {aeb_signal}")
+                                if aeb_signal == 0.0:
+                                    if self.lastspeed > 0:
+                                        command = {"action": "speed", "speed": self.lastspeed}
+                                        self.sendToSerial(command)
+
+                                elif aeb_signal == 1.0:
+                                    command = {"action": "speed", "speed": 0}
+                                    self.sendToSerial(command)
+                                
+
+                            ########################### LaneKeeping ###########################
+                            if aeb_signal != 1.0:
+                                laneRecv = self.lanekeepingSubscriber.receive()
+                                if laneRecv is not None:
+                                    if self.debugger:
+                                        self.logger.info(laneRecv)
+                                    command = {"action": "steer", "steerAngle": int(laneRecv-10)}
+                                    #print("serial Write : ", int(laneRecv - 10))
+                                    self.sendToSerial(command)
+                                    #print("\t\t\t\t\tserial Write : ",int(laneRecv - 10))
+
+                                laneRecv_speed = self.lanespeedSubscriber.receive()
+                                if laneRecv_speed is not None:
+                                    laneRecv_speed = int(laneRecv_speed) + (100 if self.highwayMode else 0) # Highway Mode Speed
+                                    if self.debugger:
+                                        self.logger.info(laneRecv_speed)
+                                    command = {"action": "speed", "speed":int(laneRecv_speed)}
+                                    #print("#####speed: ",int(laneRecv_speed))
                                     self.sendToSerial(command)
 
-                            elif aeb_signal == 1.0:
-                                command = {"action": "brake", "steerAngle": 250}
+                        else:
+                            brakeRecv = self.brakeSubscriber.receive()# other brake
+                            if brakeRecv is not None:
+                                if self.debugger:
+                                    self.logger.info(brakeRecv)
+                                command = {"action": "brake", "steerAngle": int(brakeRecv)}
                                 self.sendToSerial(command)
-                            
 
-                        brakeRecv = self.brakeSubscriber.receive()# other brake
+                            speedRecv = self.speedMotorSubscriber.receive()
+                            if speedRecv is not None: 
+                                if self.debugger:
+                                    self.logger.info(speedRecv)
+                                command = {"action": "speed", "speed": int(speedRecv)}
+                                self.lastspeed = int(speedRecv)
+                                self.sendToSerial(command)
 
-                    ########################### LaneKeeping ###########################
-                        laneRecv = self.lanekeepingSubscriber.receive()
-                        # print("lane:",laneRecv)
-                        if laneRecv is not None:
-                            print("serial")
-                            if self.debugger:
-                                self.logger.info(laneRecv)
-                            command = {"action": "steer", "steerAngle": int(laneRecv)}
-                            print("steer: ",int(laneRecv))
-                            self.sendToSerial(command)
+                            steerRecv = self.steerMotorSubscriber.receive()
+                            if steerRecv is not None:
+                                if self.debugger:
+                                    self.logger.info(steerRecv) 
+                                command = {"action": "steer", "steerAngle": int(steerRecv)}
+                                self.sendToSerial(command)
 
-                        laneRecv_speed = self.lanespeedSubscriber.receive()
-                        if laneRecv_speed is not None:
-                            if self.debugger:
-                                self.logger.info(laneRecv_speed)
-                            command = {"action": "speed", "speed": int(laneRecv_speed)}
-                            print("speed: ",int(laneRecv_speed))
-                            self.sendToSerial(command)
-
-                        brakeRecv = self.brakeSubscriber.receive()
-                        
-                        if brakeRecv is not None:
-                            if self.debugger:
-                                self.logger.info(brakeRecv)
-                            command = {"action": "brake", "steerAngle": int(brakeRecv)}
-                            self.sendToSerial(command)
-
-                        speedRecv = self.speedMotorSubscriber.receive()
-                        if speedRecv is not None: 
-                            if self.debugger:
-                                self.logger.info(speedRecv)
-                            command = {"action": "speed", "speed": int(speedRecv)}
-                            self.lastspeed = int(speedRecv)
-                            self.sendToSerial(command)
-
-                        steerRecv = self.steerMotorSubscriber.receive()
-                        if steerRecv is not None:
-                            if self.debugger:
-                                self.logger.info(steerRecv) 
-                            command = {"action": "steer", "steerAngle": int(steerRecv)}
-                            self.sendToSerial(command)
-
-                        controlRecv = self.controlSubscriber.receive()
-                        if controlRecv is not None:
-                            if self.debugger:
-                                self.logger.info(controlRecv) 
-                            command = {
-                                "action": "vcd",
-                                "time": int(controlRecv["Time"]),
-                                "speed": int(controlRecv["Speed"]),
-                                "steer": int(controlRecv["Steer"]),
-                            }
-                            self.sendToSerial(command)
+                            controlRecv = self.controlSubscriber.receive()
+                            if controlRecv is not None:
+                                if self.debugger:
+                                    self.logger.info(controlRecv) 
+                                command = {
+                                    "action": "vcd",
+                                    "time": int(controlRecv["Time"]),
+                                    "speed": int(controlRecv["Speed"]),
+                                    "steer": int(controlRecv["Steer"]),
+                                }
+                                self.sendToSerial(command)
 
                     instantRecv = self.instantSubscriber.receive()
                     if instantRecv is not None: 

@@ -1,9 +1,11 @@
 import numpy as np
 import cv2
-from src.utils.lantracker_pi.window import Window
-from src.utils.lantracker_pi.line import Line
-from src.utils.lantracker_pi.gradients import get_edges
-from src.utils.lantracker_pi.perspective import flatten_perspective
+from concurrent.futures import ThreadPoolExecutor
+from Brain.src.utils.lantracker_pi.window import Window
+from Brain.src.utils.lantracker_pi.line import Line
+from Brain.src.utils.lantracker_pi.gradients import get_edges, optimized_get_edges
+from Brain.src.utils.lantracker_pi.perspective import flatten_perspective
+import time
 # from window import Window
 # from line import Line
 # from gradients import get_edges
@@ -14,7 +16,7 @@ class LaneTracker(object):
     Tracks the lane in a series of consecutive frames.
     """
 
-    def __init__(self, first_frame, n_windows=9):
+    def __init__(self, first_frame, mask, n_windows=15):
         """
         Initializes a tracker object.
 
@@ -29,9 +31,9 @@ class LaneTracker(object):
         self.right = None
         self.l_windows = []
         self.r_windows = []
-        self.initialize_lines(first_frame)
+        self.initialize_lines(mask)
 
-    def initialize_lines(self, frame):
+    def initialize_lines(self, flat_edges):
         """
         Finds starting points for left and right lines (e.g. lane edges) and initialises Window and Line objects.
 
@@ -40,8 +42,9 @@ class LaneTracker(object):
         frame   : Frame to scan for lane edges.
         """
         # Take a histogram of the bottom half of the image
-        edges = get_edges(frame)
-        (flat_edges, _) = flatten_perspective(edges)
+        # edges = optimized_get_edges(frame)
+        # (flat_edges, _) = flatten_perspective(edges)
+
         histogram = np.sum(flat_edges[int(self.h / 2):, :], axis=0)
 
         nonzero = flat_edges.nonzero()
@@ -50,24 +53,76 @@ class LaneTracker(object):
         r_indices = np.empty([0], dtype=np.int32)
         window_height = int(self.h / self.win_n)
 
+        l_median_centers = []
+        r_median_centers = []
+
         for i in range(self.win_n):
             l_window = Window(
                 y1=self.h - (i + 1) * window_height,
                 y2=self.h - i * window_height,
+                m = 40 if len(self.l_windows) > 0 else 70,
                 x=self.l_windows[-1].x if len(self.l_windows) > 0 else np.argmax(histogram[:self.w // 2])
             )
+            
             r_window = Window(
                 y1=self.h - (i + 1) * window_height,
                 y2=self.h - i * window_height,
+                m = 40 if len(self.l_windows) > 0 else 70,
                 x=self.r_windows[-1].x if len(self.r_windows) > 0 else np.argmax(histogram[self.w // 2:]) + self.w // 2
             )
-            # Append nonzero indices in the window boundary to the lists
-            l_indices = np.append(l_indices, l_window.pixels_in(nonzero), axis=0)
-            r_indices = np.append(r_indices, r_window.pixels_in(nonzero), axis=0)
+
+            l_pixel_indices = l_window.pixels_in(nonzero)
+            r_pixel_indices = r_window.pixels_in(nonzero)
+
+            l_x_pixels = nonzero[1][l_pixel_indices]
+            r_x_pixels = nonzero[1][r_pixel_indices]
+            l_y_pixels = nonzero[0][l_pixel_indices]
+            r_y_pixels = nonzero[0][r_pixel_indices]
+
+            if len(l_x_pixels) > 0 and len(l_y_pixels) > 0:
+                l_median_x = np.mean(l_x_pixels)
+                l_median_y = np.mean(l_y_pixels)
+                l_median_centers.append((l_median_x, l_median_y))
+
+            if len(r_x_pixels) > 0 and len(r_y_pixels) > 0:
+                r_median_x = np.mean(r_x_pixels)
+                r_median_y = np.mean(r_y_pixels)
+                r_median_centers.append((r_median_x, r_median_y))
+
+            l_indices = np.append(l_indices, l_pixel_indices, axis=0)
+            r_indices = np.append(r_indices, r_pixel_indices, axis=0)
+
             self.l_windows.append(l_window)
             self.r_windows.append(r_window)
-        self.left = Line(x=nonzero[1][l_indices], y=nonzero[0][l_indices], h=self.h, w = self.w)
-        self.right = Line(x=nonzero[1][r_indices], y=nonzero[0][r_indices], h=self.h, w = self.w)
+
+        l_median_xs = np.array([pt[0] for pt in l_median_centers])
+        l_median_ys = np.array([pt[1] for pt in l_median_centers])
+        r_median_xs = np.array([pt[0] for pt in r_median_centers])
+        r_median_ys = np.array([pt[1] for pt in r_median_centers])
+
+        self.left = Line(x=l_median_xs, y=l_median_ys, h=self.h, w=self.w)
+        self.right = Line(x=r_median_xs, y=r_median_ys, h=self.h, w=self.w)
+
+        # for i in range(self.win_n):
+        #     l_window = Window(
+        #         y1=self.h - (i + 1) * window_height,
+        #         y2=self.h - i * window_height,
+        #         m = 40 if len(self.l_windows) > 0 else 70,
+        #         x=self.l_windows[-1].x if len(self.l_windows) > 0 else np.argmax(histogram[:self.w // 2])
+        #     )
+        #     r_window = Window(
+        #         y1=self.h - (i + 1) * window_height,
+        #         y2=self.h - i * window_height,
+        #         m = 40 if len(self.l_windows) > 0 else 70,
+        #         x=self.r_windows[-1].x if len(self.r_windows) > 0 else np.argmax(histogram[self.w // 2:]) + self.w // 2
+        #     )
+        #     # Append nonzero indices in the window boundary to the lists
+        #     l_indices = np.append(l_indices, l_window.pixels_in(nonzero), axis=0)
+        #     r_indices = np.append(r_indices, r_window.pixels_in(nonzero), axis=0)
+        #     self.l_windows.append(l_window)
+        #     self.r_windows.append(r_window)
+        # self.left = Line(x=nonzero[1][l_indices], y=nonzero[0][l_indices], h=self.h, w = self.w)
+        # self.right = Line(x=nonzero[1][r_indices], y=nonzero[0][r_indices], h=self.h, w = self.w)
 
     def scan_frame_with_windows(self, frame, windows):
         """
@@ -85,12 +140,22 @@ class LaneTracker(object):
         indices = np.empty([0], dtype=np.int32)
         nonzero = frame.nonzero()
         window_x = None
-        for window in windows:
-            indices = np.append(indices, window.pixels_in(nonzero, window_x), axis=0)
+        no_pixel_count = 0
+        for i, window in enumerate(windows):
+            win_indices = window.pixels_in(nonzero, window_x)
+            if len(win_indices) < 20:
+                no_pixel_count += 1
+            else:
+                no_pixel_count = 0
+            
+            if no_pixel_count >=4:
+                #print("no pixel detected")
+                break
+            indices = np.append(indices, win_indices, axis=0)
             window_x = window.mean_x
         return (nonzero[1][indices], nonzero[0][indices])
 
-    def process(self, frame, draw_lane=True, draw_statistics=True):
+    def process(self, frame, flat_edges, unwarp_matrix, draw_lane=True, draw_statistics=True):
         """
         Performs a full lane tracking pipeline on a frame.
 
@@ -104,37 +169,87 @@ class LaneTracker(object):
         -------
         Resulting frame.
         """
-        edges = get_edges(frame)
-        (flat_edges, unwarp_matrix) = flatten_perspective(edges)
-        (l_x, l_y) = self.scan_frame_with_windows(flat_edges, self.l_windows)
-        self.left.process_points(l_x, l_y)
-        (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
-        self.right.process_points(r_x, r_y)
-        offset, curvature = self.calculate_metrics(frame.shape)
 
+        (l_x, l_y) = self.scan_frame_with_windows(flat_edges, self.l_windows)
+        (r_x, r_y) = self.scan_frame_with_windows(flat_edges, self.r_windows)
+
+
+       # print("l: ",len(l_x),"r: ", len(r_x))
+        left_visible = len(l_x) > 2000
+        right_visible = len(r_x) > 2000
+
+        if not left_visible and right_visible:
+            print("left not visible")
+            self.update_missing_windows(self.l_windows, self.r_windows, direction="left", lane_width=300)
+
+            predicted_left_points = self.predict_missing_lane(self.right, lane_width=300, direction="left")
+            self.left.process_points(predicted_left_points[:, 0], predicted_left_points[:, 1])
+            self.right.process_points(r_x, r_y)
+
+        elif not right_visible and left_visible:
+            print("right not visible")
+            self.update_missing_windows(self.r_windows, self.l_windows, direction="right", lane_width=300)
+
+            predicted_right_points = self.predict_missing_lane(self.left, lane_width=300, direction="right")
+            self.right.process_points(predicted_right_points[:, 0], predicted_right_points[:, 1])
+            self.left.process_points(l_x, l_y)
+
+        # If both lanes are not visible, we process all points
+        if not left_visible and not right_visible:
+            if self.left and self.right:
+                print("both not visible use previous data")
+                #l_x, l_y = self.left.get_points()[:, 0], self.left.get_points()[:, 1]
+                #r_x, r_y = self.right.get_points()[:, 0], self.right.get_points()[:, 1]
+                #self.left.process_points(l_x, l_y)
+                #self.right.process_points(r_x, r_y)
+            else:
+                print("no previous data")
+
+        # If both lanes are visible, we process all points
+        if left_visible and right_visible:
+            self.left.process_points(l_x, l_y)
+            self.right.process_points(r_x, r_y)
+
+        offset, curvature = self.calculate_metrics(flat_edges.shape)
         if draw_statistics:
-            edges = get_edges(frame, separate_channels=True)
-            debug_overlay = self.draw_debug_overlay(flatten_perspective(edges)[0])
+            debug_overlay = self.draw_debug_overlay(flat_edges)
             cv2.imshow("Debug",debug_overlay)
             key = cv2.waitKey(1)
-            top_overlay = self.draw_lane_overlay(flatten_perspective(frame)[0])
-            cv2.imshow("Top", top_overlay)
-            key = cv2.waitKey(1)
-            debug_overlay = cv2.resize(debug_overlay, (0, 0), fx=0.2, fy=0.2)
-            top_overlay = cv2.resize(top_overlay, (0, 0), fx=0.2, fy=0.2)
-            frame[:250, :, :] = frame[:250, :, :] * .4
-            (h, w, _) = debug_overlay.shape
-            # frame[20:20 + h, 20:20 + w, :] = debug_overlay
-            # # # frame[20:20 + h, 20 + 20 + w:20 + 20 + w + w, :] = top_overlay
-            # frame[20 + 20 + h :20 + 20 + h + h, 20:20 + w, :] = top_overlay
-            text_x = 20 + w + 20 + 20
-            self.draw_text(frame, 'radius curve:  {} m'.format(self.radius_of_curvature()), text_x, 70)
-            self.draw_text(frame, 'Distance from center (left):  {:.2f} cm'.format(self.left.camera_distance()), text_x, 130)
-            self.draw_text(frame, 'Distance from center (right):  {:.2f} cm'.format(self.right.camera_distance()), text_x, 190)
-        
+
+            #top_overlay = self.draw_lane_overlay(frame)
+            #lane_center = int((np.mean(self.left.get_points()[:,0]) + np.mean(self.right.get_points()[:,0]))/2)
+            #frame_center = top_overlay.shape[1] // 2
+            #cv2.circle(top_overlay, (lane_center, 0), 3, (0, 0, 255), -1)
+            #cv2.circle(top_overlay, (frame_center, 0), 3, (255, 0, 0), -1)
+            #cv2.imshow("Top", top_overlay)
+            #key = cv2.waitKey(1)
+
         if draw_lane:
             frame = self.draw_lane_overlay(frame, unwarp_matrix)
+
         return frame, offset, curvature
+
+
+    def predict_missing_lane(self, visible_lane, lane_width, direction="right"):
+        visible_points = visible_lane.get_points()  
+        if direction == "right":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] += lane_width  
+        elif direction == "left":
+            predicted_points = visible_points.copy()
+            predicted_points[:, 0] -= lane_width  
+        return predicted_points
+
+    def update_missing_windows(self, missing_windows, reference_windows, direction, lane_width=300):
+        for missing_window, reference_window in zip(missing_windows, reference_windows):
+            if direction == "left":
+                missing_window.x = reference_window.x - lane_width
+            elif direction == "right":
+                missing_window.x = reference_window.x + lane_width
+    
+            
+
+
     
     def calculate_metrics(self, frame_shape):
         # Calculate lane curvature
@@ -142,19 +257,27 @@ class LaneTracker(object):
 
         # Calculate lane center offset
         # Using only last window x pixels
-        lane_center = (self.left.get_points()[-1][0] + self.right.get_points()[-1][0]) / 2
+        #lane_center = (self.left.get_points()[0][0] + self.right.get_points()[0][0]) / 2
         
         # Using all window's x pixels
-        #lane_center = (np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2
-        
+        left_points = self.left.get_points()
+        right_points = self.right.get_points()
+
+        min_length = min(len(left_points), len(right_points))
+        left_x = left_points[:min_length, 0]
+        right_x = right_points[:min_length, 0]
+
+
+        lane_center = (np.mean(left_x) + np.mean(right_x)) / 2    
         # Using weights average(more weights on near lane)
         #weights = np.linspace(1, 0, len(self.left.get_points()))
         #lane_center = (np.average(self.left.get_points()[:, 0], weights=weights) + np.average(self.right.get_points()[:, 0], weights=weights)) / 2
         
         frame_center = frame_shape[1] // 2
-        offset = (frame_center - lane_center) * 40 / 700  # Convert to cm
-        print("offset: ",offset, "cm")
+        offset = (frame_center - lane_center) * 35 / 310  # Convert to cm in BFMC Format(35cm, 960x540=352pixels, 270x480=310pixels )
         return offset, curvature
+
+
 
     def draw_text(self, frame, text, x, y):
         cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .6, (255, 255, 255), 2)
@@ -188,6 +311,25 @@ class LaneTracker(object):
         if lines:
             cv2.polylines(image, [self.left.get_points()], False, (1., 0, 0), 2)
             cv2.polylines(image, [self.right.get_points()], False, (1., 0, 0), 2)
+
+        height, width, _ = image.shape
+
+        center_x = width // 2
+        cv2.line(image, (center_x, 0), (center_x, height), (0, 1., 0), 2)
+
+
+        left_points = self.left.get_points()
+        right_points = self.right.get_points()
+
+        min_length = min(len(left_points), len(right_points))
+        left_x = left_points[:min_length, 0]
+        right_x = right_points[:min_length, 0]
+
+
+        lane_center_x = (np.mean(left_x) + np.mean(right_x)) / 2    
+        #lane_center_x = int((np.mean(self.left.get_points()[:, 0]) + np.mean(self.right.get_points()[:, 0])) / 2)
+        cv2.circle(image, (int(lane_center_x), height // 2), 5, (0, 0, 1.), -1)
+
         return image * 255
 
     def draw_lane_overlay(self, image, unwarp_matrix=None):
